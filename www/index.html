@@ -2114,7 +2114,9 @@ async function http(url,{method='GET',headers={},body,binary=false,form=false,ti
     return {status:r.status,bytes,text,headers:hd};
   }
   const pc=PCS(); let tgt=null; try{ tgt=new URL(url); }catch(e){}
-  const direct=tgt&&(/(^|\.)(github\.com|githubusercontent\.com|github\.io)$/i.test(tgt.hostname)||localStorage.getItem('ggm-proxy-off')!=='0'); // GitHub는 항상 직접. 나머지도 기본 직접 연결(프록시 우회) — 끄면 전부 프록시 경유
+  /* 직접 연결 기본값: 사용자가 정했으면 그대로 두고, 정한 적 없으면 — 외부 웹(github.io 등)에서 PC 서버를 연결했으면 프록시 경유가 기본(직접 연결은 CORS로 막혀요). 나머지(앱·PC 서버 화면)는 직접 연결이 기본이에요 */
+  let pxOff=null; try{ const v=localStorage.getItem('ggm-proxy-off'); if(v!=null) pxOff=(v!=='0'); }catch(e){}
+  const direct=tgt&&(/(^|\.)(github\.com|githubusercontent\.com|github\.io)$/i.test(tgt.hostname)||(pxOff!=null?pxOff:!(pc&&!IS_NATIVE&&location.origin!==pc.base)));
   if(pc&&tgt&&!direct&&tgt.origin!==pc.base&&(!IS_NATIVE||isLocalHost(tgt.hostname))&&!url.startsWith(pc.base)){
     return http(pc.base+'/api/proxy?u='+encodeURIComponent(url),{method,headers:Object.assign({},headers,{'X-GGM-Key':pc.key}),body,binary,form,timeout});
   }
@@ -7136,7 +7138,7 @@ async function lkTake(btn){ if(LK.busy) return; LK.busy=true; const box=$('#devl
     LK.claimed=true; LK.wasLocked=false; say('최신 진행을 확인하는 중…'); pulled=await lkPullIfNewer(); if(!pulled){ lkUnlock(); lkLoop(); toast('여기서 이어서 해요'); }
   }catch(e){ if(box) box.insertAdjacentHTML('beforeend','<p style="color:var(--rose)">연결에 실패했어요. 잠시 뒤 다시 눌러 주세요.</p><button class="btn" data-act="lktake">다시 시도</button>'); }
   finally{ if(!pulled) LK.busy=false; } }
-document.addEventListener('change',e=>{ if(e.target&&e.target.id==='pc_proxy_off'){ try{ localStorage.setItem('ggm-proxy-off', e.target.checked?'1':'0'); toast(e.target.checked?'직접 연결 (프록시 우회)':'프록시 경유 (CORS 해결)'); }catch(e2){} } });
+
 document.addEventListener('visibilitychange',async()=>{ if(!LKMODE()) return;
   if(document.visibilityState==='hidden'){ if(LK.claimed&&!LK.locked){ clearInterval(LK.t); try{ await lkSave(true); await lkOp('away'); }catch(e){} } }
   else setTimeout(lkActivate,600); });
@@ -7196,7 +7198,7 @@ async function pcStart(){
         openModal(`${head('PC에 더 새 게임이 있어요')}<p><b>${esc(S.device||'다른 기기')}</b> · ${esc(new Date(S.at).toLocaleString())}</p><div class="row" style="margin-top:12px"><button class="btn" data-act="pcpull">받기</button><button class="btn ghost" data-act="close">나중에</button></div>`); }; show(); }
   }catch(e){ toast('PC 서버에 연결하지 못했어요. PC에서 서버 창이 켜져 있는지 확인해 주세요'); }
 }
-document.addEventListener('change',e=>{ if(e.target&&e.target.id==='pc_proxy_off'){ try{ localStorage.setItem('ggm-proxy-off', e.target.checked?'1':'0'); toast(e.target.checked?'직접 연결 (프록시 우회)':'프록시 경유 (CORS 해결)'); }catch(e2){} } });
+
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'&&!LKMODE()){ const pc=PCS(); if(pc&&pc.auto!==false&&(G.prog.savedAt||0)>(pc.localAt||0)+3000) pcPush(true); } });
 setInterval(()=>{ const pc=PCS(); if(pc&&pc.auto!==false&&!PCJOB&&!LK.locked&&(G.prog.savedAt||0)>(pc.localAt||0)+3000) pcPush(true); },2*60000);
 function openPcSet(){ const pc=PCS();
@@ -7205,7 +7207,7 @@ function openPcSet(){ const pc=PCS();
     <label class="f" for="pc_link">PC 서버 주소 (QR 주소를 붙여 넣기)</label><input class="in" id="pc_link" value="${pc?esc(pc.base+'/?pc='+pc.key):''}" placeholder="https://xxxx.trycloudflare.com/?pc=...">
     <label style="display:flex;gap:8px;margin-top:10px"><input type="checkbox" id="pc_auto" ${!pc||pc.auto!==false?'checked':''}><span>자동으로 PC에 저장 (앱을 나갈 때, 5분마다)</span></label>
     <label style="display:flex;gap:8px;margin-top:6px"><input type="checkbox" id="pc_lock" ${!pc||pc.lock!==false?'checked':''}><span>한 번에 한 기기만 (다른 기기에서 하면 여기는 멈추고, 넘겨받을 때 진행을 이어받아요)</span></label>
-    <label class="f" style="display:flex;gap:8px;align-items:center;margin:8px 0 0"><input type="checkbox" id="pc_proxy_off" ${localStorage.getItem('ggm-proxy-off')!=='0'?'checked':''}> <b>프록시 우회 (직접 연결)</b> <span class="muted" style="font-size:.78rem">(켜면 모든 API를 브라우저에서 직접 연결 — 로컬 서비스·CORS 허용 API에 좋아요. 끄면 PC 서버 프록시 경유 — CORS 오류가 나는 API에 꺼 주세요)</span></label>
+    <label class="f" style="display:flex;gap:8px;align-items:center;margin:8px 0 0"><input type="checkbox" id="pc_proxy_off" ${(()=>{ let v=null; try{ const s=localStorage.getItem('ggm-proxy-off'); if(s!=null) v=(s!=='0'); }catch(e){} return v!=null?v:!((()=>{try{return PCS()&&location.origin!==PCS().base}catch(e){return false}})()); })()?'checked':''}> <b>프록시 우회 (직접 연결)</b> <span class="muted" style="font-size:.78rem">(켜면 모든 API를 브라우저에서 직접 연결. 끄면 PC 서버 프록시 경외 — CORS가 막히는 웹(github.io)에선 꺼 주세요. 외부 웹에선 기본으로 꺼져 있어요)</span></label>
     <div class="row" style="margin-top:12px"><button class="btn" data-act="pcsave">연결</button>${pc?'<button class="btn ghost" data-act="pcoff">연결 해제</button>':''}</div>
     ${pc?`<div class="row" style="margin-top:8px"><button class="btn sm" data-act="pcpush">지금 PC에 저장</button><button class="btn sm ghost" data-act="pcpull">PC에서 받기</button></div>`:''}
     <p class="muted" style="margin-top:10px;font-size:.8rem">PC 서버 프로그램은 공개 저장소의 gacha-game-maker-pc.zip에 있어요(Python 필요). 주소는 PC 서버를 켤 때마다 바뀌어요.</p>`); }
@@ -7346,7 +7348,7 @@ async function syCheckOnStart(){
       openModal(`${head('다른 기기의 새 데이터가 있어요')}<p><b>${esc(S.device||'다른 기기')}</b> · ${esc(new Date(S.at).toLocaleString())}</p>${localChanged?'<p style="color:var(--rose)">이 기기에도 아직 올리지 않은 진행이 있어요. 받으면 이 기기의 진행은 덮어써져요.</p>':''}<div class="row" style="margin-top:12px"><button class="btn" data-act="sypull">받기</button><button class="btn ghost" data-act="close">나중에</button></div>`); };
     show(); }catch(e){}
 }
-document.addEventListener('change',e=>{ if(e.target&&e.target.id==='pc_proxy_off'){ try{ localStorage.setItem('ggm-proxy-off', e.target.checked?'1':'0'); toast(e.target.checked?'직접 연결 (프록시 우회)':'프록시 경유 (CORS 해결)'); }catch(e2){} } });
+
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'&&!LKMODE()){ const o=SY(); if(syReady()&&o.autoUp&&!SYJOB&&(G.prog.savedAt||0)>(o.localAt||0)+5000) syPush(false); } });
 function openSync(){
   const o=SY();
@@ -9181,7 +9183,7 @@ setupAI(); render(); loadAudio().then(()=>sceneBgm());
   if(PCS()) setTimeout(()=>{ try{ pcStart(); }catch(e){} },2500);
   if(!IS_NATIVE){ try{ navigator.storage&&navigator.storage.persist&&navigator.storage.persist(); }catch(e){} if(IS_IOS&&!IS_STANDALONE&&!localStorage.getItem('ggm-a2hs')){ let n=0; const tryA=()=>{ if(localStorage.getItem('ggm-a2hs')) return; if($('#modal').hidden&&$('#ov').hidden) openA2HS(true); else if(n++<400) setTimeout(tryA,3000); }; setTimeout(tryA,2500); } }
 })();
-document.addEventListener('change',e=>{ if(e.target&&e.target.id==='pc_proxy_off'){ try{ localStorage.setItem('ggm-proxy-off', e.target.checked?'1':'0'); toast(e.target.checked?'직접 연결 (프록시 우회)':'프록시 경유 (CORS 해결)'); }catch(e2){} } });
+
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&!$('#ov').querySelector('.title')&&P().seenOpening) setTimeout(()=>liveTick(false),800); });
 if('serviceWorker' in navigator && location.protocol==='https:' && !window.Capacitor) navigator.serviceWorker.register('sw.js').catch(()=>{});
 const CAP=window.Capacitor&&window.Capacitor.Plugins;
