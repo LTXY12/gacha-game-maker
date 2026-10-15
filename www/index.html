@@ -1854,6 +1854,12 @@ body.abyss-full .dgcard{margin-top:0}
 const __GID=(()=>{ try{ const pj=JSON.parse(localStorage.getItem('starfall-projects')); if(pj&&pj.active&&String(pj.active).trim()) return String(pj.active).trim(); }catch(e){} return 'main'; })();
 function gkey(k){ return k+'::'+__GID; }
 (function(){ ['ggm-prompts','starfall-ai-profiles','starfall-nai','ggm-packs','starfall-sound','ggm-sync','starfall-plugs','ggm-autogen'].forEach(k=>{ try{ const g=k+'::'+__GID; if(localStorage.getItem(g)==null){ const o=localStorage.getItem(k); if(o!=null) localStorage.setItem(g,o); } }catch(e){} }); })();
+/* API 키·연결 주소는 모든 게임이 공유하고, 모델 선택 같은 나머지 설정만 게임별로 나눠요:
+   읽을 때 공유 필드를 전역 값으로 덮고, 저장할 때 공유 필드는 전역 키에만 씁니다 */
+function readShared(k,g,fields){ let o={}; try{o=JSON.parse(localStorage.getItem(k))||{};}catch(e){} let s={}; try{s=JSON.parse(localStorage.getItem(g))||{};}catch(e){} fields.forEach(f=>{ if(s[f]!=null&&s[f]!=='') o[f]=s[f]; }); return o; }
+function writeShared(k,g,fields,o){ try{ const c=JSON.parse(JSON.stringify(o||{})); let s={}; try{s=JSON.parse(localStorage.getItem(g))||{};}catch(e){} fields.forEach(f=>{ if(c[f]!=null){ s[f]=c[f]; delete c[f]; } }); try{localStorage.setItem(g,JSON.stringify(s));}catch(e2){} try{localStorage.setItem(k,JSON.stringify(c));}catch(e3){} }catch(e){} }
+function naiWrite(o){ writeShared(NKEY,'starfall-nai',['key','endpoint'],o); }
+function sndWrite(o){ writeShared(SKEY,'starfall-sound',['fishKey','elKey','elBase'],o); }
 /* =========================================================
    규칙과 형식
    ========================================================= */
@@ -2031,12 +2037,22 @@ const AKEY='starfall-ai', PKEY=gkey('starfall-ai-profiles'), NKEY=gkey('starfall
 const AITYPE={anthropic:'Claude API',vertex:'Google Vertex AI',gemini:'Gemini API (AI Studio)',openai:'OpenAI 호환 (OpenRouter 등)',copilot:'GitHub Copilot (구독 필요)'};
 const DEFM={anthropic:['claude-sonnet-5-5','claude-haiku-4-5-20251001'],gemini:['gemini-2.5-pro','gemini-2.5-flash'],vertex_google:['gemini-2.5-pro','gemini-2.5-flash'],vertex_anthropic:['',''],openai:['',''],copilot:['gpt-4.1','gpt-4.1']};
 let NAIJOB=null, APD=null;
+/* 글 AI: 연결 목록(키·주소·종류)은 모든 게임이 공유하고, 어느 모델을 골랐는지(active·model·quick)만 게임별로 나눠요 */
 function AIP(){
-  let d=null; try{d=JSON.parse(localStorage.getItem(PKEY));}catch(e){}
-  if(!d){ d={active:'',fallback:true,list:[]}; try{const o=JSON.parse(localStorage.getItem(AKEY)); if(o&&o.key){const p={id:'p'+Date.now(),name:'Claude',type:'anthropic',key:o.key,model:o.model||'',quick:o.quick||''};d.list.push(p);d.active=p.id;}}catch(e){} localStorage.setItem(PKEY,JSON.stringify(d)); }
-  d.list=d.list||[]; return d;
+  let g=null; try{g=JSON.parse(localStorage.getItem('starfall-ai-profiles'));}catch(e){}
+  if(!g||!Array.isArray(g.list)||!g.list.length){ try{g=JSON.parse(localStorage.getItem(PKEY));}catch(e){ g=null; } if(!g||!Array.isArray(g.list)||!g.list.length) g=null; }
+  if(!g){ const d={active:'',fallback:true,list:[]}; try{const o=JSON.parse(localStorage.getItem(AKEY)); if(o&&o.key){const p={id:'p'+Date.now(),name:'Claude',type:'anthropic',key:o.key,model:o.model||'',quick:o.quick||''};d.list.push(p);d.active=p.id;}}catch(e){} try{localStorage.setItem('starfall-ai-profiles',JSON.stringify(d));}catch(e2){} g=d; }
+  let pg=null; try{pg=JSON.parse(localStorage.getItem(PKEY))||{};}catch(e){ pg={}; }
+  const list=(g.list||[]).map(pr=>Object.assign({},pr,((pg&&pg.models)||{})[pr.id]||{}));
+  const act=(pg&&pg.active&&list.some(x=>x.id===pg.active))?pg.active:((g.active&&list.some(x=>x.id===g.active))?g.active:(list[0]&&list[0].id||''));
+  return {active:act,fallback:(pg&&pg.fb!=null)?pg.fb:(g.fallback!=null?g.fallback:true),list};
 }
-function saveAIP(d){localStorage.setItem(PKEY,JSON.stringify(d));setupAI();}
+function saveAIP(d){
+  try{ localStorage.setItem('starfall-ai-profiles',JSON.stringify({active:'',fallback:d.fallback!==false,list:(d.list||[]).map(pr=>{const o=Object.assign({},pr); delete o.model; delete o.quick; return o;})})); }catch(e){}
+  const models={}; (d.list||[]).forEach(pr=>{ if(String(pr.model||'').trim()||String(pr.quick||'').trim()) models[pr.id]={model:pr.model||'',quick:pr.quick||''}; });
+  try{ localStorage.setItem(PKEY,JSON.stringify({active:d.active,fb:d.fallback,models})); }catch(e){}
+  setupAI();
+}
 function defKey(p){return p.type==='vertex'?'vertex_'+(p.pub||'google'):p.type;}
 function normBase(b){ let s=String(b||'').trim().replace(/\/+$/,'').replace(/\/chat\/completions$/i,'').replace(/\/+$/,'');
   try{ const u=new URL(s); if(/^(www\.)?ollama\.com$/i.test(u.hostname)) return 'https://ollama.com/v1';
@@ -2406,7 +2422,7 @@ function llmWrap(pr){ const L=llmEff(); let s=String(pr);
   return (L.top?'[제작자 지침]\n'+L.top.trim()+'\n\n':'')+s+(L.bot?'\n\n[제작자 지침]\n'+L.bot.trim():''); }
 const packCode=p=>'GGMPACK:'+btoa(unescape(encodeURIComponent(JSON.stringify(p))));
 function packFromCode(t){ const m=String(t||'').trim().match(/GGMPACK:([A-Za-z0-9+/=]+)/); if(!m) return null; try{ const o=JSON.parse(decodeURIComponent(escape(atob(m[1])))); return o&&typeof o==='object'?o:null; }catch(e){ return null; } }
-function packApply(p){ if(p.tags!=null||p.neg!=null){ const c=naiCfg(); c.styles=[{id:'my_style',name:'내 그림체',tags:p.tags||'',neg:p.neg||''}]; c.styleId='my_style'; if(p.qtags!=null){ c.qtags=p.qtags; c.quality=true; } ['steps','scale','cfgRescale','sampler'].forEach(k=>{ if(p[k]!=null&&p[k]!=='') c[k]=p[k]; }); try{ localStorage.setItem(NKEY,JSON.stringify(c)); }catch(e){} } }
+function packApply(p){ if(p.tags!=null||p.neg!=null){ const c=naiCfg(); c.styles=[{id:'my_style',name:'내 그림체',tags:p.tags||'',neg:p.neg||''}]; c.styleId='my_style'; if(p.qtags!=null){ c.qtags=p.qtags; c.quality=true; } ['steps','scale','cfgRescale','sampler'].forEach(k=>{ if(p[k]!=null&&p[k]!=='') c[k]=p[k]; }); try{ naiWrite(c); }catch(e){} } }
 function packHTML(){ const up=userPacks();
   return `${head('그림체 프리셋','<span class="muted">적용하면 그림 AI 설정에 바로 들어가요</span>')}
   <h3 class="sec">기본 프리셋</h3>${STYLE_PRESETS.map(p=>`<div class="ep">${pthumbHTML(p.id)}<span class="t"><b>${esc(p.name)}</b><span class="muted">${esc(p.desc||'')}${p.by?' · '+esc(p.by):''}</span></span><button class="btn sm" data-act="packuse" data-v="${p.id}">적용</button><button class="btn sm ghost" data-act="pthumbset" data-v="${p.id}" title="썸네일">🖼</button></div>`).join('')}
@@ -2426,7 +2442,7 @@ function llmHTML(){ const L=llmSlots(); return `${head('글 AI 지침','<span cl
     <div class="row" style="margin-top:6px"><button class="btn sm ghost" data-act="prompts">📝 AI 프롬프트 편집</button></div>
     <div class="row" style="margin-top:8px"><button class="btn sm" data-act="llmpadd">프리셋 저장</button><button class="btn sm ghost" data-act="llmpimport">코드로 가져오기</button></div></div>`; }
 // 초안에서 고른 프리셋을 그림 AI 설정에 바로 적용해요(그림체 태그·네거티브·품질 태그·스텝·가이던스·샘플러)
-function presetToCfg(id){ const s=allPresets().find(x=>x.id===id); if(!s) return false; const c=naiCfg(); c.styles=[{id:'my_style',name:'내 그림체',tags:s.tags,neg:s.neg}]; c.styleId='my_style'; c.qtags=s.qtags; c.quality=true; c.steps=s.steps; c.scale=s.scale; c.cfgRescale=s.cfgRescale; c.sampler=s.sampler; try{ localStorage.setItem(NKEY,JSON.stringify(c)); }catch(e){ return false; } return true; }
+function presetToCfg(id){ const s=allPresets().find(x=>x.id===id); if(!s) return false; const c=naiCfg(); c.styles=[{id:'my_style',name:'내 그림체',tags:s.tags,neg:s.neg}]; c.styleId='my_style'; c.qtags=s.qtags; c.quality=true; c.steps=s.steps; c.scale=s.scale; c.cfgRescale=s.cfgRescale; c.sampler=s.sampler; try{ naiWrite(c); }catch(e){ return false; } return true; }
 function drPresetHTML(){ const cur=DR2.preset||''; return `<label class="f">그림체 프리셋</label><div class="dr-pres">${[{id:'',name:'지금 설정 그대로',desc:'설정 → 그림 AI의 그림체를 써요'},...allPresets()].map(s=>`<button type="button" class="dr-pre ${cur===s.id?'on':''}" data-act="drpreset" data-v="${s.id}">${s.id?pthumbHTML(s.id,'big'):''}<b>${esc(s.name)}</b><span>${esc(s.desc)}${s.by?` · 프리셋 제공: ${esc(s.by)}`:''}</span></button>`).join('')}</div><p class="muted" style="margin:4px 0 0;font-size:.76rem">고르면 그림 AI 설정(그림체·품질 태그·스텝·가이던스·샘플러)에 바로 적용되고, 이 게임의 그림체로 저장돼요.</p>`; }
 function applyStylePreset(id){ const s=allPresets().find(x=>x.id===id); if(!s) return; const set=(k,v)=>{ const e=$('#'+k); if(e) e.value=v; };
   set('nai_stags',s.tags); set('nai_sneg',s.neg); set('nai_qt',s.qtags); set('nai_q','1'); set('nai_steps',s.steps); set('nai_scale',s.scale); set('nai_cfgr',s.cfgRescale); set('nai_sampler',s.sampler);
@@ -2435,7 +2451,7 @@ const NAI_QUALITY={'nai-diffusion-5-full':'very aesthetic, masterpiece, best qua
 const ILK=k=>k==='illust'||k==='lbcg';
 const isV4p=m=>/^nai-diffusion-(?:4|5)(?:-|$)/.test(String(m||'').trim());
 const isV45=m=>/^nai-diffusion-4-5/.test(String(m||'').trim());
-function naiCfg(){let o={};try{o=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){}const r=Object.assign({},NAI_DEF,o);
+function naiCfg(){let o=readShared(NKEY,'starfall-nai',['key','endpoint']);const r=Object.assign({},NAI_DEF,o);
   r.endpoint=String(r.endpoint||NAI_ENDPOINT).trim().replace(/^https?:\/\/api\.novelai\.net/i,'https://image.novelai.net')||NAI_ENDPOINT;
   r.parts={}; ['char','bg','prop','cg','enemy','illust','lbcg','map','icon'].forEach(k=>{r.parts[k]=Object.assign({},NAI_DEF.parts[k],(o.parts||{})[k]||{});});
   r.sizes=Object.assign({},NAI_DEF.sizes,o.sizes||{}); r.ref=Object.assign({},NAI_DEF.ref,o.ref||{});
@@ -2899,7 +2915,7 @@ const EL_DEF='https://api.elevenlabs.io';
 function elUrl(path){ let b=String(SND().elBase||'').trim().replace(/\/+$/,'').replace(/\/v1$/,''); if(b&&!/^https?:\/\//i.test(b)&&/\./.test(b)) b='https://'+b; if(!/^https?:\/\/[^/]+/i.test(b)) b=EL_DEF; return b+path; }
 const SND_DEF={sfxOn:true,sfxVol:0.6,fishKey:'',fishModel:'s2.1-pro',elKey:'',elBase:'',elModel:'music_v1',elLen:90,bgmVol:0.5,voiceVol:1,bgmOn:true,voiceStory:true,voiceLobby:true,
   scene:{title:'타이틀',lobby:'로비',battle:'전투',boss:'보스전',gacha:'계약'}};
-function SND(){let o={};try{o=JSON.parse(localStorage.getItem(SKEY))||{};}catch(e){}const r=Object.assign({},SND_DEF,o);r.scene=Object.assign({},SND_DEF.scene,o.scene||{});return r;}
+function SND(){const o=readShared(SKEY,'starfall-sound',['fishKey','elKey','elBase']);const r=Object.assign({},SND_DEF,o);r.scene=Object.assign({},SND_DEF.scene,o.scene||{});return r;}
 const audioCache={};
 async function storeAudio(o,blob){ await idbPut(IMGNS+'a_'+o.id,blob); if(audioCache[o.id]) URL.revokeObjectURL(audioCache[o.id]); audioCache[o.id]=URL.createObjectURL(blob); o.audio={idb:true}; mark('l:'+o.id); }
 async function loadAudio(){ for(const l of G.lib){ if(l.audio&&l.audio.idb&&!audioCache[l.id]){ try{const b=await idbGetNS('a_'+l.id); if(b) audioCache[l.id]=URL.createObjectURL(b);}catch(e){} } } }
@@ -5365,10 +5381,10 @@ function swProfile(){ return Object.assign({},APD,{id:'p'+uid(),name:APD.name||A
 function swAddAI(){ const p=swProfile(); if(!apValid(p)) return false; const A=AIP(); if(A.list.some(x=>(x.key&&x.key===p.key)||(x.sa&&x.sa===p.sa&&x.model===p.model))) return true; A.list.push(p); if(!A.list.some(x=>x.id===A.active)) A.active=p.id; saveAIP(A); SW.hasAI=true; return true; }
 function swSave(){
   swAddAI();
-  { let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){} sv.provider=SW.img; sv.comfy=Object.assign({},comfyCfg(),SW.cf); localStorage.setItem(NKEY,JSON.stringify(sv)); }
-  if(SW.nai){ let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){} sv.key=SW.nai; localStorage.setItem(NKEY,JSON.stringify(sv)); }
-  if(SW.cst) swStyleId(); if(SW.autoArt){ const sv=naiSaved(); sv.autoArt=SW.autoArt; localStorage.setItem(NKEY,JSON.stringify(sv)); }
-  if(SW.fish||SW.el){ const o=SND(); if(SW.fish) o.fishKey=SW.fish; if(SW.el) o.elKey=SW.el; localStorage.setItem(SKEY,JSON.stringify(o)); }
+  { let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){} sv.provider=SW.img; sv.comfy=Object.assign({},comfyCfg(),SW.cf); naiWrite(sv); }
+  if(SW.nai){ let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){} sv.key=SW.nai; naiWrite(sv); }
+  if(SW.cst) swStyleId(); if(SW.autoArt){ const sv=naiSaved(); sv.autoArt=SW.autoArt; naiWrite(sv); }
+  if(SW.fish||SW.el){ const o=SND(); if(SW.fish) o.fishKey=SW.fish; if(SW.el) o.elKey=SW.el; sndWrite(o); }
 }
 function renderSetup(){
   const st=SW.step, dots=[0,1,2,3,4,5].map(i=>`<i class="${i<=st?'on':''}"></i>`).join(''), a=SW.ai, help=SETUP_HELP[a.type];
@@ -6973,7 +6989,7 @@ function artAfterAI(snap,label){
 /* ===== 그림체 (직접 입력) ===== */
 const STYLE_EX='예: anime coloring, cel shading, vibrant colors  /  watercolor (medium), soft colors  /  1.2::artist:이름 ::';
 function naiSaved(){let sv={};try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){}return sv;}
-function setMyStyle(tags,neg){const sv=naiSaved();sv.styles=[{id:'my_style',name:'내 그림체',tags:String(tags||'').trim(),neg:String(neg||'').trim()}];sv.styleId='my_style';localStorage.setItem(NKEY,JSON.stringify(sv));}
+function setMyStyle(tags,neg){const sv=naiSaved();sv.styles=[{id:'my_style',name:'내 그림체',tags:String(tags||'').trim(),neg:String(neg||'').trim()}];sv.styleId='my_style';naiWrite(sv);}
 function myStyle(){return naiCfg().styles[0];}
 const BOOT_CATS=[['char','스탠딩 (전신)',true],['upper','상반신 (스토리·프로필)',true],['illust','일러스트 (타이틀·로비·픽업)',true],['bg','배경',true],['icon','재화 아이콘',true],['prop','소품 (스토리에 나오는 물건)',true],['weapon','전용 무기',true],['enemy','적',false],['map','작전 지도',false],['cg','이벤트 CG',false],['scg','기술 컷인',false]];
 let BP=null;
@@ -7236,8 +7252,8 @@ function bootPrepRun(cats){
 
 /* ===== PC·폰 연동 (내 GitHub 비공개 저장소) ===== */
 const SYKEY=gkey('ggm-sync'), SYIDX='ggm-sync-idx';
-function SY(){ try{ return JSON.parse(localStorage.getItem(SYKEY))||{}; }catch(e){ return {}; } }
-function saveSY(o){ localStorage.setItem(SYKEY,JSON.stringify(o)); }
+function SY(){ try{ return readShared(SYKEY,'ggm-sync',['token']); }catch(e){ return {}; } }
+function saveSY(o){ writeShared(SYKEY,'ggm-sync',['token'],o); }
 function syIdx(){ try{ return JSON.parse(localStorage.getItem(SYIDX))||{}; }catch(e){ return {}; } }
 function saveSyIdx(o){ try{ localStorage.setItem(SYIDX,JSON.stringify(o)); }catch(e){} }
 function syDevice(){ const o=SY(); return o.device||(IS_NATIVE?'안드로이드 폰':IS_IOS?'아이폰':document.body.classList.contains('desk')?'PC':'브라우저'); }
@@ -7250,7 +7266,7 @@ async function gh(o,path,opt){ opt=opt||{}; const tries=opt.tries||0; let r; try
   if(r.status===403||r.status===429){ const t=r.text||''; if(/secondary rate|abuse|rate limit/i.test(t)&&!opt.retried){ await wait(61000); return gh(o,path,Object.assign({},opt,{retried:true})); } }
   if(r.status>=400&&!opt.okStatus?.includes(r.status)) throw Object.assign(errOf(r),{status:r.status});
   if(opt.binary) return r; try{ return r.text?JSON.parse(r.text):{}; }catch(e){ return {}; } }
-function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY,PLUGKEY,'ggm-draft2','ggm-drafts',PRKEY,gkey('ggm-autogen'),'ggm-ng-draft'); if(withKeys) keys.push(PKEY); return keys; }
+function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY,PLUGKEY,'ggm-draft2','ggm-drafts',PRKEY,gkey('ggm-autogen'),'ggm-ng-draft','starfall-ai-profiles','starfall-nai','starfall-sound','ggm-sync'); if(withKeys) keys.push(PKEY); return keys; }
 function syStrip(k,v,withKeys){ if(withKeys||v==null) return v; try{ if(k===NKEY){ const o=JSON.parse(v); delete o.key; return JSON.stringify(o); } if(k===SKEY){ const o=JSON.parse(v); delete o.fishKey; delete o.elKey; return JSON.stringify(o); } }catch(e){} return v; }
 function syMerge(k,v){ if(v==null) return v; try{ if(k===NKEY){ const cur=JSON.parse(localStorage.getItem(NKEY)||'{}'), o=JSON.parse(v); if(!o.key&&cur.key) o.key=cur.key; return JSON.stringify(o); } if(k===SKEY){ const cur=JSON.parse(localStorage.getItem(SKEY)||'{}'), o=JSON.parse(v); ['fishKey','elKey'].forEach(x=>{ if(!o[x]&&cur[x]) o[x]=cur[x]; }); return JSON.stringify(o); } }catch(e){} return v; }
 let SYJOB=null;
@@ -8285,7 +8301,7 @@ document.addEventListener('click',async e=>{
   case 'pcpull': { const pc=PCS(); if(pc&&pc.last&&(G.prog.savedAt||0)>(pc.localAt||0)+5000&&!confirm('이 기기에 아직 PC에 저장하지 않은 진행이 있어요. 받으면 덮어써져요. 받을까요?')) break; closeModal(); pcPull(); break; }
   case 'csframe': { const p2=P(); p2.csFull=!p2.csFull; mark('prog'); const a2=$('.cs-art'); if(a2){ a2.classList.toggle('up',!p2.csFull); const cc=charById(a2.dataset.id); if(cc) a2.innerHTML=art(cc,'',{upper:!p2.csFull}); } t.textContent=p2.csFull?'상반신':'전신'; break; }
   case 'artgo': { const k=ART_ASK; ART_ASK=null; closeModal(); if(k) artRun(k); break; }
-  case 'artalways': { const sv=naiSaved(); sv.autoArt='auto'; localStorage.setItem(NKEY,JSON.stringify(sv)); const k=ART_ASK; ART_ASK=null; closeModal(); if(k) artRun(k); toast('앞으로는 자동으로 그려요. 설정 → 그림 AI에서 바꿀 수 있어요'); break; }
+  case 'artalways': { const sv=naiSaved(); sv.autoArt='auto'; naiWrite(sv); const k=ART_ASK; ART_ASK=null; closeModal(); if(k) artRun(k); toast('앞으로는 자동으로 그려요. 설정 → 그림 AI에서 바꿀 수 있어요'); break; }
   case 'castre': { if(!CAST) break; const k=t.dataset.k; if(!CAST.q.some(x=>x.c===id&&x.k===k)&&!(CAST.busy&&CAST.busy.c===id&&CAST.busy.k===k)) CAST.q.push({c:id,k}); castRefresh(id); castRun(); break; }
   case 'castfaces': openCastFaces(); break;
   case 'cfsel': { const set=t.dataset.k==='f'?CFSEL.faces:CFSEL.chars, v=t.dataset.v; set.has(v)?set.delete(v):set.add(v); t.classList.toggle('on',set.has(v)); break; }
@@ -8766,7 +8782,7 @@ case 'sttab': STTAB=t.dataset.k||''; render(); $('#view').scrollTop=0; break;
   case 'packsave': { const nm=prompt('프리셋 이름'); if(!nm) break; const by=prompt('만든 사람 (선택, 공유할 때 표시돼요)')||''; const c=naiCfg(), st=(c.styles||[]).find(x=>x.id===c.styleId)||(c.styles||[])[0]||{}, L=llmSlots();
       const p={id:'u'+uid(),name:nm.trim().slice(0,30),by:by.trim().slice(0,20),desc:'내가 만든 팩',tags:st.tags||'',neg:st.neg||'',qtags:c.qtags||'',steps:c.steps,scale:c.scale,cfgRescale:c.cfgRescale,sampler:c.sampler};
       const a=userPacks(); a.unshift(p); if(saveUserPacks(a)) toast('프리셋으로 저장했어요. 내보내기로 코드를 공유할 수 있어요'); openModal(packHTML()); break; }
-  case 'naisave': { localStorage.setItem(NKEY,JSON.stringify(readNai())); closeModal(); render(); toast('그림 AI 설정을 저장했어요'); break; }
+  case 'naisave': { naiWrite(readNai()); closeModal(); render(); toast('그림 AI 설정을 저장했어요'); break; }
   case 'saload': { const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; const tx=await f.text(); if($('#ap_sa')) $('#ap_sa').value=tx; try{ const j=JSON.parse(tx); if($('#ap_project')&&!$('#ap_project').value) $('#ap_project').value=j.project_id||''; toast('서비스 계정 키를 불러왔어요'); }catch(e){ toast('JSON 파일이 아니에요'); } }; inp.click(); break; }
   case 'cfload': { const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; const tx=await f.text(); const box=$('#cf_wf')||$('#sw_cfwf'); if(box) box.value=tx; try{ const j=JSON.parse(tx); toast(Array.isArray(j.nodes)?'UI 형식이에요. Export (API)로 저장한 파일을 넣어 주세요':'워크플로를 불러왔어요 (노드 '+Object.keys(j).length+'개)'); }catch(e){ toast('JSON 파일이 아니에요'); } }; inp.click(); break; }
   case 'cftest': { const u=(($('#cf_url')||$('#sw_cfurl'))||{}).value; if(!u){toast('주소를 넣어 주세요');break;} t.disabled=true;
@@ -8980,8 +8996,8 @@ case 'sttab': STTAB=t.dataset.k||''; render(); $('#view').scrollTop=0; break;
   case 'sndsave': { const o=SND(); Object.assign(o,{sfxVol:+$('#sd_xv').value/100,bgmVol:+$('#sd_bv').value/100,voiceVol:+$('#sd_vv').value/100,bgmOn:$('#sd_bon').value==='1',voiceStory:$('#sd_vs').value==='1',voiceLobby:$('#sd_vl').value==='1',voiceLang:$('#sd_lang')?$('#sd_lang').value:'ko',
       fishKey:$('#sd_fk').value.trim(),fishModel:$('#sd_fm').value,elKey:$('#sd_ek').value.trim(),elBase:$('#sd_eb')?$('#sd_eb').value.trim():(o.elBase||''),elModel:$('#sd_em').value,elLen:num($('#sd_el').value,10,300,90),
       scene:{title:$('#sd_title').value,lobby:$('#sd_lobby').value,battle:$('#sd_battle').value,boss:$('#sd_boss').value,gacha:$('#sd_gacha').value}});
-      localStorage.setItem(SKEY,JSON.stringify(o)); P().scene=clone(o.scene); mark('prog'); closeModal(); render(); BGM.name=null; sceneBgm(); toast('소리 설정을 저장했어요'); break; }
-  case 'fishtest': { const k=$('#sd_fk').value.trim(); if(!k){toast('Fish Audio 키를 넣어 주세요');break;} const o=SND(); o.fishKey=k; localStorage.setItem(SKEY,JSON.stringify(o));
+      sndWrite(o); P().scene=clone(o.scene); mark('prog'); closeModal(); render(); BGM.name=null; sceneBgm(); toast('소리 설정을 저장했어요'); break; }
+  case 'fishtest': { const k=$('#sd_fk').value.trim(); if(!k){toast('Fish Audio 키를 넣어 주세요');break;} const o=SND(); o.fishKey=k; sndWrite(o);
       try{ await fishSearch('','',1); toast('Fish Audio 연결 성공'); }catch(e){ toast('연결 실패. '+(AIERR[e&&e.code]||'')+' '+((e&&e.message)||'')); } break; }
   case 'voice': if($('#modal .sheet.cs-sheet')||$('#modal .sk-card')) MBACK=()=>openChar(id); VS={cid:id,sid:t.dataset.s||'',results:[],picks:{},lang:VS.lang||'ko',q:''}; if(!SND().fishKey) toast('설정의 소리에서 Fish Audio 키를 먼저 넣어 주세요'); renderVoice(); break;
   case 'vtest': { const c=charById(id); await speak(c,c.intro||c.lines[0]||c.name); break; }
@@ -9034,7 +9050,7 @@ case 'sttab': STTAB=t.dataset.k||''; render(); $('#view').scrollTop=0; break;
   case 'cutnudge': { const j=CUTJOB; if(!j||!j.cv) break; if(j.cx<0){ j.cx=j.W/2; j.cy=j.H/2; } j.cx=Math.max(0,Math.min(j.W-1,Math.round(j.cx)+(+t.dataset.dx))); j.cy=Math.max(0,Math.min(j.H-1,Math.round(j.cy)+(+t.dataset.dy))); cutPlaceCursor(); cutDrawLoupe(); break; }
   case 'cuthere': cutEraseHere(); break;
   case 'cutsave': { const j=CUTJOB; if(!j||!j.cv||!j.changed) break; const o=naiTarget(j.kind,j.id); const blob=await cutBlob();
-      if(j.opt&&$('#ct_def')&&$('#ct_def').checked){ let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){} sv.cut=j.opt; localStorage.setItem(NKEY,JSON.stringify(sv)); }
+      if(j.opt&&$('#ct_def')&&$('#ct_def').checked){ let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){} sv.cut=j.opt; naiWrite(sv); }
       if(ILK(j.kind)){ await storeImage(o,blob,''); mark('c:'+j.id); CUTJOB=null; render(); openChar(j.id); toast('저장했어요'); break; }
       await storeImage(o,blob,j.kind==='char'?'c:':'l:'); CUTJOB=null; render(); if(j.kind==='char') openChar(o.id); else openLibItem(o.id); toast('배경을 지웠어요'); break; }
   case 'ailooks': { const list=G.lib.filter(l=>l.kind==='enemy'&&!l.prompt); if(!list.length){toast('외형이 빈 적이 없어요');break;}
@@ -9075,11 +9091,11 @@ case 'sttab': STTAB=t.dataset.k||''; render(); $('#view').scrollTop=0; break;
   case 'guidecopy': shareText(G.meta.title+' 테스트 안내',guideText()); break;
   case 'styopen': { const back=t.dataset.back||'';
       if(back==='prep'&&NPREP&&$('#np_in')) NPREP.draft=Object.fromEntries(['np_in','np_neg','np_seed','np_model','np_size','np_frame','np_pose','np_posesel'].filter(k=>$('#'+k)).map(k=>[k,$('#'+k).value]));
-      else if($('#nai_key')){ localStorage.setItem(NKEY,JSON.stringify(readNai())); toast('지금까지 바꾼 그림 AI 설정을 저장했어요'); }
+      else if($('#nai_key')){ naiWrite(readNai()); toast('지금까지 바꾼 그림 AI 설정을 저장했어요'); }
       openStyles(back); break; }
   case 'styadd': { const x={id:'s'+uid(),name:'새 화풍',tags:'',neg:''}; $('#styList').insertAdjacentHTML('beforeend',styRow(x)); $('#sty_def').insertAdjacentHTML('beforeend',`<option value="${x.id}">새 화풍</option>`); const rows=document.querySelectorAll('#styList .styrow'); const last=rows[rows.length-1]; last.scrollIntoView({block:'center'}); last.querySelector('.sty-n').select(); break; }
   case 'stydel': { const r=t.closest('.styrow'); if(!r) break; if(document.querySelectorAll('#styList .styrow').length<=1){toast('프리셋은 하나 이상 있어야 해요');break;} const o2=$('#sty_def').querySelector(`option[value="${r.dataset.sid}"]`); if(o2) o2.remove(); r.remove(); break; }
-  case 'stysave': { const st=readStyles(); let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(err){} sv.styles=st; const d=$('#sty_def').value; sv.styleId=st.some(x=>x.id===d)?d:st[0].id; sv.seeded=['am_v5']; localStorage.setItem(NKEY,JSON.stringify(sv)); toast('화풍 프리셋을 저장했어요');
+  case 'stysave': { const st=readStyles(); let sv={}; try{sv=JSON.parse(localStorage.getItem(NKEY))||{};}catch(err){} sv.styles=st; const d=$('#sty_def').value; sv.styleId=st.some(x=>x.id===d)?d:st[0].id; sv.seeded=['am_v5']; naiWrite(sv); toast('화풍 프리셋을 저장했어요');
       if(STYBACK==='prep'&&NPREP){ const dr=NPREP.draft; openNaiPrep(NPREP.kind,NPREP.id); if(dr) Object.entries(dr).forEach(([k,v])=>{ const el=$('#'+k); if(el) el.value=v; }); } else openNaiSet(); break; }
   case 'shopbuy': { const it=SHOP_ITEMS().find(x=>x.id===id), sd=shopDay(), m=G.meta.shop; if(!it) break;
       if((sd.buy[it.id]||0)>=it.limit){toast('오늘은 매진이에요');break;}
