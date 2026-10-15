@@ -1849,6 +1849,11 @@ body.abyss-full .dgcard{margin-top:0}
 <input type="file" id="drfile" accept=".json,.txt,application/json,text/plain" hidden>
 
 <script>
+/* 게임별 설정: 전역이던 설정 저장 키를 현재 게임 전용(::게임ID)으로 바꿔요.
+   게임을 바꾸면 앱이 다시 떠서 이 값도 새 게임 기준으로 정해져요. 처음엔 옛 전역 값을 가져와서 시작해요 */
+const __GID=(()=>{ try{ const pj=JSON.parse(localStorage.getItem('starfall-projects')); if(pj&&pj.active&&String(pj.active).trim()) return String(pj.active).trim(); }catch(e){} return 'main'; })();
+function gkey(k){ return k+'::'+__GID; }
+(function(){ ['ggm-prompts','starfall-ai-profiles','starfall-nai','ggm-packs','starfall-sound','ggm-sync','starfall-plugs','ggm-autogen'].forEach(k=>{ try{ const g=k+'::'+__GID; if(localStorage.getItem(g)==null){ const o=localStorage.getItem(k); if(o!=null) localStorage.setItem(g,o); } }catch(e){} }); })();
 /* =========================================================
    규칙과 형식
    ========================================================= */
@@ -1858,7 +1863,7 @@ function genderText(){ const t=String(P().genderTxt||'').trim(), lk=String(P().l
 function genderText0(){ const g=P().gender; return g==='m'?`플레이어(${T('player')})는 남성이다. 호칭과 반응을 그에 맞춘다. `:g==='f'?`플레이어(${T('player')})는 여성이다. 호칭과 반응을 그에 맞춘다. `:`플레이어(${T('player')})의 성별은 정하지 않는다. 성별이 드러나는 호칭은 피한다. `; }
 function callText(){ const n=String(P().player||'').trim(), t=T('player'); return n&&n!==t?`${T('crew')}들은 플레이어를 보통 호칭 "${t}"(으)로 부른다. 이름 "${n}"은(는) 친밀한 순간이나 꼭 필요할 때만 부른다. `:`${T('crew')}들은 플레이어를 호칭 "${t}"(으)로 부른다. `; }
 /* 등장인물 성별 구성: f=여성만, m=남성만, mix=혼성, ''=AI가 정함. 아군·NPC를 만드는 모든 요청에 들어가요 */
-const PRKEY='ggm-prompts';
+const PRKEY=gkey('ggm-prompts');
 function PROMPTS(){ try{ return JSON.parse(localStorage.getItem(PRKEY))||{}; }catch(e){ return {}; } }
 function PR(key,vars){
   const c=PROMPTS()[key];
@@ -2022,7 +2027,7 @@ const MAT={exp:'expMat',wmat:'wMat',core:'core'};
 /* =========================================================
    AI 연결: 여러 글 AI(Claude, Vertex, Gemini, OpenAI 호환) + NovelAI
    ========================================================= */
-const AKEY='starfall-ai', PKEY='starfall-ai-profiles', NKEY='starfall-nai';
+const AKEY='starfall-ai', PKEY=gkey('starfall-ai-profiles'), NKEY=gkey('starfall-nai');
 const AITYPE={anthropic:'Claude API',vertex:'Google Vertex AI',gemini:'Gemini API (AI Studio)',openai:'OpenAI 호환 (OpenRouter 등)',copilot:'GitHub Copilot (구독 필요)'};
 const DEFM={anthropic:['claude-sonnet-5-5','claude-haiku-4-5-20251001'],gemini:['gemini-2.5-pro','gemini-2.5-flash'],vertex_google:['gemini-2.5-pro','gemini-2.5-flash'],vertex_anthropic:['',''],openai:['',''],copilot:['gpt-4.1','gpt-4.1']};
 let NAIJOB=null, APD=null;
@@ -2375,7 +2380,7 @@ const STYLE_PRESETS=[{id:'glossy',name:'닭장 그림체',by:'토스뱅킹',desc
   steps:28,scale:5,sampler:'k_euler_ancestral',cfgRescale:0.4}];
 /* ===== 그림체 프리셋(내 프리셋): 태그·네거티브·품질·스텝·가이던스·리스케일·샘플러를 저장하고, 코드 한 줄(GGMPACK:…)로 공유해요.
    글 AI 지침(상단·중단·하단)은 설정 → 글 AI → 생성 지침에서 따로 정해요 ===== */
-const PACKKEY='ggm-packs', LLMKEY='ggm-llmslot';
+const PACKKEY=gkey('ggm-packs'), LLMKEY='ggm-llmslot';
 function userPacks(){ try{ const a=JSON.parse(localStorage.getItem(PACKKEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
 function saveUserPacks(a){ try{ localStorage.setItem(PACKKEY,JSON.stringify(a.slice(0,50))); return true; }catch(e){ toast('저장 공간이 부족해요'); return false; } }
 /* 그림체 프리셋 썸네일: 프리셋 id별로 작은 그림(160px JPEG)을 이 기기에 저장해요. 내 프리셋을 코드로 내보내면 썸네일도 같이 가요 */
@@ -2888,7 +2893,7 @@ async function naiGenerate0(prompt,kind,opts){
 /* =========================================================
    소리: 배경음(ElevenLabs Music 또는 파일), 음성(Fish Audio)
    ========================================================= */
-const SKEY='starfall-sound';
+const SKEY=gkey('starfall-sound');
 // ElevenLabs 주소: 설정에 적으면 그 주소(중계 서버 등), 비우면 공식 주소
 const EL_DEF='https://api.elevenlabs.io';
 function elUrl(path){ let b=String(SND().elBase||'').trim().replace(/\/+$/,'').replace(/\/v1$/,''); if(b&&!/^https?:\/\//i.test(b)&&/\./.test(b)) b='https://'+b; if(!/^https?:\/\/[^/]+/i.test(b)) b=EL_DEF; return b+path; }
@@ -7230,7 +7235,7 @@ function bootPrepRun(cats){
 
 
 /* ===== PC·폰 연동 (내 GitHub 비공개 저장소) ===== */
-const SYKEY='ggm-sync', SYIDX='ggm-sync-idx';
+const SYKEY=gkey('ggm-sync'), SYIDX='ggm-sync-idx';
 function SY(){ try{ return JSON.parse(localStorage.getItem(SYKEY))||{}; }catch(e){ return {}; } }
 function saveSY(o){ localStorage.setItem(SYKEY,JSON.stringify(o)); }
 function syIdx(){ try{ return JSON.parse(localStorage.getItem(SYIDX))||{}; }catch(e){ return {}; } }
@@ -7245,7 +7250,7 @@ async function gh(o,path,opt){ opt=opt||{}; const tries=opt.tries||0; let r; try
   if(r.status===403||r.status===429){ const t=r.text||''; if(/secondary rate|abuse|rate limit/i.test(t)&&!opt.retried){ await wait(61000); return gh(o,path,Object.assign({},opt,{retried:true})); } }
   if(r.status>=400&&!opt.okStatus?.includes(r.status)) throw Object.assign(errOf(r),{status:r.status});
   if(opt.binary) return r; try{ return r.text?JSON.parse(r.text):{}; }catch(e){ return {}; } }
-function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY,'starfall-plugs','ggm-draft2','ggm-drafts','ggm-prompts','ggm-autogen','ggm-ng-draft'); if(withKeys) keys.push(PKEY); return keys; }
+function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY,PLUGKEY,'ggm-draft2','ggm-drafts',PRKEY,gkey('ggm-autogen'),'ggm-ng-draft'); if(withKeys) keys.push(PKEY); return keys; }
 function syStrip(k,v,withKeys){ if(withKeys||v==null) return v; try{ if(k===NKEY){ const o=JSON.parse(v); delete o.key; return JSON.stringify(o); } if(k===SKEY){ const o=JSON.parse(v); delete o.fishKey; delete o.elKey; return JSON.stringify(o); } }catch(e){} return v; }
 function syMerge(k,v){ if(v==null) return v; try{ if(k===NKEY){ const cur=JSON.parse(localStorage.getItem(NKEY)||'{}'), o=JSON.parse(v); if(!o.key&&cur.key) o.key=cur.key; return JSON.stringify(o); } if(k===SKEY){ const cur=JSON.parse(localStorage.getItem(SKEY)||'{}'), o=JSON.parse(v); ['fishKey','elKey'].forEach(x=>{ if(!o[x]&&cur[x]) o[x]=cur[x]; }); return JSON.stringify(o); } }catch(e){} return v; }
 let SYJOB=null;
@@ -9281,7 +9286,7 @@ $('#bkfile').addEventListener('change',async e=>{
 
 
 /* ===== 플러그인 시스템 ===== */
-const PLUGKEY='starfall-plugs';
+const PLUGKEY=gkey('starfall-plugs');
 function plugStore(){ try{ return JSON.parse(localStorage.getItem(PLUGKEY))||[]; }catch(e){ return []; } }
 function savePlugStore(a){ try{ localStorage.setItem(PLUGKEY,JSON.stringify(a)); }catch(e){} }
 function plugCards(){
@@ -9315,8 +9320,8 @@ function openPlugins(){
   openModal(head('플러그인 관리')+'<h4 class="sec">설치된 플러그인</h4>'+plugCards()+'<h4 class="sec">플러그인 추가</h4>'+plugAddUI());
 }
 /* ===== 자동 생성 정책 ===== */
-function autoGenPolicy(){ try{ const v=localStorage.getItem('ggm-autogen'); if(v) return v; }catch(e){} try{ const a=(typeof naiCfg==='function'&&naiCfg().autoArt)||'ask'; return ['ask','auto','off'].includes(a)?a:'ask'; }catch(e2){ return 'ask'; } }
-function setAutoGenPolicy(v){ try{ localStorage.setItem('ggm-autogen',v); }catch(e){} }
+function autoGenPolicy(){ try{ const v=localStorage.getItem(gkey('ggm-autogen')); if(v) return v; }catch(e){} try{ const a=(typeof naiCfg==='function'&&naiCfg().autoArt)||'ask'; return ['ask','auto','off'].includes(a)?a:'ask'; }catch(e2){ return 'ask'; } }
+function setAutoGenPolicy(v){ try{ localStorage.setItem(gkey('ggm-autogen'),v); }catch(e){} }
 </script>
 <script>
 (function(){ try{
