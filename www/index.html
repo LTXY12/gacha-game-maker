@@ -9352,7 +9352,7 @@ function setAutoGenPolicy(v){ try{ localStorage.setItem(gkey('ggm-autogen'),v); 
     document.head.appendChild(el);
   }catch(e){ return false; }
   return !(window.__PLUG_ERR&&window.__PLUG_ERR[String(p.id||'')]); };
-  const L=JSON.parse(localStorage.getItem('starfall-plugs'))||[];
+  const L=(()=>{ try{ const k=(typeof gkey==='function')?gkey('starfall-plugs'):'starfall-plugs'; const cur=localStorage.getItem(k); if(cur!=null) return JSON.parse(cur)||[]; }catch(e){} try{ return JSON.parse(localStorage.getItem('starfall-plugs'))||[]; }catch(e){ return []; } })();
   L.forEach(p=>{ if(!p||!p.enabled||!p.code) return; const ok=window.PLUGRUN(p); window.__PLUG_RUN[p.id]=ok; });
 }catch(e){} })();
 
