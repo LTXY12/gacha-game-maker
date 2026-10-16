@@ -2378,7 +2378,7 @@ const NAI_FRAMES=[['full body','전신'],['cowboy shot','무릎 위'],['upper bo
 const FRAME_TAGS=/^(full body|cowboy shot|upper body|portrait|lower body|feet out of frame)$/i;
 const NAI_DEF={key:'',autoPrep:false,endpoint:NAI_ENDPOINT,model:'nai-diffusion-5-full',refModel:'nai-diffusion-4-5-full',steps:28,scale:6,cfgRescale:0.5,sampler:'k_euler_ancestral',noise:'karras',retries:3,timeoutSec:120,saveFmt:'webp',webpQ:0.9,
   cutout:true,transparent:true,quality:true,qtags:'',prefix:'',styleId:'my_style',autoArt:'ask',
-  sizes:{char:'832x1216',bg:'1216x832',prop:'1024x1024',cg:'1216x832',enemy:'1024x1024',illust:'832x1216',lbcg:'832x1216',map:'832x1216',icon:'1024x1024'},
+  sizes:{char:'832x1216',bg:'1216x832',prop:'1024x1024',cg:'1216x832',enemy:'1024x1024',illust:'832x1216',upper:'832x1216',scg:'832x1216',lbcg:'832x1216',map:'832x1216',icon:'1024x1024'},
   ref:{type:'character',strength:1,fidelity:1},
   styles:[{id:'my_style',name:'내 그림체',tags:'',neg:''}],
   poses:NAI_POSES.map(([n,t])=>({n,t})),
@@ -2510,10 +2510,10 @@ function naiDraw(kind,base,opt){
 const SKILL_TAGS={dmg:'attacking, slashing, weapon swing',aoe:'casting spell, magic circle, explosion, energy wave',heal:'casting spell, healing light, sparkles',shield:'magic barrier, shield, defensive stance',buff:'raising hand, aura, cheering, light rays'};
 function naiDrawItem(it){
   if((it.k==='prop'||it.k==='bg'||it.k==='enemy')&&!it.o.prompt) return ensureLibPrompts().then(()=>naiDraw(it.k,it.o.prompt));
-  if(it.k==='upper'){ const c=it.c; return naiDraw('char',joinTags(c.naiPrompt,it.o.prompt),{frame:'cowboy shot',pose:'looking at viewer, smile',styleId:c.naiStyle}); }
+  if(it.k==='upper'){ const c=it.c; return naiDraw('char',joinTags(c.naiPrompt,it.o.prompt),{frame:'cowboy shot',pose:'looking at viewer, smile',styleId:c.naiStyle,size:naiSize('upper')}); }
   if(it.k==='lbbg'){ const c=it.c; return naiDraw('bg',it.o.prompt||(c.illust&&c.illust.prompt)||'cozy room interior, window, soft light',{}); }
   if(it.k==='pose'){ const c=it.c; return naiDraw('char',joinTags(c.naiPrompt,it.o.prompt),{frame:'cowboy shot',pose:it.o.prompt?'':'dynamic pose, looking at viewer, smile, hand up, white background, simple background',styleId:c.naiStyle}); }
-  if(it.k==='scg'){ const c=it.c; return naiDraw('illust',joinTags(c.naiPrompt,it.o.prompt),{pose:'dynamic pose, action shot, '+(SKILL_TAGS[c.skill&&c.skill.kind]||'attacking')+', special effects, glowing, motion lines, dramatic angle, intense expression',styleId:c.naiStyle,frame:'upper body'}); }
+  if(it.k==='scg'){ const c=it.c; return naiDraw('illust',joinTags(c.naiPrompt,it.o.prompt),{pose:'dynamic pose, action shot, '+(SKILL_TAGS[c.skill&&c.skill.kind]||'attacking')+', special effects, glowing, motion lines, dramatic angle, intense expression',styleId:c.naiStyle,frame:'upper body',size:naiSize('scg')}); }
   if(it.k==='illust'||it.k==='lbcg'){ const c=it.c; return naiDraw(it.k,joinTags(c.naiPrompt,it.o.prompt),{pose:it.o.naiPose!=null?it.o.naiPose:undefined,styleId:c.naiStyle,frame:it.o.naiFrame}); }
   if(it.k==='cg') return naiDraw('cg',null,{item:it.o,styleId:it.o.naiStyle});
   if(it.k==='char') return naiDraw('char',it.o.naiPrompt,{pose:it.o.naiPose||undefined,styleId:it.o.naiStyle,frame:it.o.naiFrame});
@@ -4991,6 +4991,8 @@ function openNaiSet(){
     <div class="g2"><div><label class="f" for="nai_sz_char">스탠딩</label><select class="in" id="nai_sz_char">${sz('char')}</select></div><div><label class="f" for="nai_sz_bg">배경</label><select class="in" id="nai_sz_bg">${sz('bg')}</select></div></div>
     <div class="g2"><div><label class="f" for="nai_sz_prop">소품·무기</label><select class="in" id="nai_sz_prop">${sz('prop')}</select></div><div><label class="f" for="nai_sz_cg">CG</label><select class="in" id="nai_sz_cg">${sz('cg')}</select></div></div>
     <div class="g2"><div><label class="f" for="nai_sz_enemy">적</label><select class="in" id="nai_sz_enemy">${sz('enemy')}</select></div><div><label class="f" for="nai_sz_illust">일러스트</label><select class="in" id="nai_sz_illust">${sz('illust')}</select></div></div>
+    <div class="g2"><div><label class="f" for="nai_sz_upper">상반신</label><select class="in" id="nai_sz_upper">${sz('upper')}</select></div><div><label class="f" for="nai_sz_scg">기술 컷인</label><select class="in" id="nai_sz_scg">${sz('scg')}</select></div></div>
+    <div class="g2"><div><label class="f" for="nai_sz_lbcg">돌파 CG</label><select class="in" id="nai_sz_lbcg">${sz('lbcg')}</select></div><div style="align-self:end"><p class="muted" style="margin:0;font-size:.76rem">로비 포즈는 스탠딩 크기를, 무기는 소품 크기를 따라요</p></div></div>
     <h3 class="sec">캐릭터 레퍼런스 기본값</h3>
     <div class="g4"><div style="grid-column:span 2"><label class="f" for="nai_rt">종류</label><select class="in" id="nai_rt">${opt([['character','캐릭터'],['character&style','캐릭터+화풍'],['style','화풍만']],c.ref.type)}</select></div><div><label class="f" for="nai_rs">강도</label><input class="in" id="nai_rs" type="number" step="0.1" value="${c.ref.strength}"></div><div><label class="f" for="nai_rf">충실도</label><input class="in" id="nai_rf" type="number" step="0.1" value="${c.ref.fidelity}"></div></div>
     <h3 class="sec">그림체 프리셋</h3>
@@ -5019,7 +5021,7 @@ function readNai(){
   return {key:v('nai_key'),endpoint:v('nai_ep')||NAI_ENDPOINT,model:v('nai_model')||NAI_DEF.model,refModel:v('nai_rmodel')||NAI_DEF.refModel,sampler:$('#nai_sampler').value,noise:$('#nai_noise').value,
     steps:num(v('nai_steps'),1,50,28),scale:num(v('nai_scale'),0,10,6),cfgRescale:num(v('nai_cfgr'),0,1,0),retries:num(v('nai_retry'),1,5,3),timeoutSec:old.timeoutSec,
     saveFmt:($('#nai_fmt')?$('#nai_fmt').value:'webp'),webpQ:+(($('#nai_wq')&&$('#nai_wq').value)||0.9),provider:$('#nai_prov').value,comfy:{url:v('cf_url'),wf:$('#cf_wf').value.trim(),qtags:v('cf_q'),neg:v('cf_n'),timeoutSec:num(v('cf_t'),30,1200,300)},quality:$('#nai_q').value==='1',qtags:v('nai_qt'),cutout:$('#nai_cut').value==='1',transparent:$('#nai_tp').value==='1',prefix:v('nai_prefix'),neg:v('nai_neg'),autoArt:$('#nai_auto').value,
-    sizes:{char:$('#nai_sz_char').value,bg:$('#nai_sz_bg').value,prop:$('#nai_sz_prop').value,cg:$('#nai_sz_cg').value,enemy:$('#nai_sz_enemy').value,illust:$('#nai_sz_illust').value},cut:Object.assign({},old.cut),
+    sizes:{char:$('#nai_sz_char').value,bg:$('#nai_sz_bg').value,prop:$('#nai_sz_prop').value,cg:$('#nai_sz_cg').value,enemy:$('#nai_sz_enemy').value,illust:$('#nai_sz_illust').value,upper:$('#nai_sz_upper').value,scg:$('#nai_sz_scg').value,lbcg:$('#nai_sz_lbcg').value},cut:Object.assign({},old.cut),
     ref:{type:$('#nai_rt').value,strength:num(v('nai_rs'),0,1,1),fidelity:num(v('nai_rf'),0,1,1)},
     styles:[{id:'my_style',name:'내 그림체',tags:v('nai_stags'),neg:v('nai_sneg')}],styleId:'my_style',poses:poses.length?poses:NAI_DEF.poses,parts};
 }
