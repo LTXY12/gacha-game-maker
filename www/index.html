@@ -2376,7 +2376,7 @@ const NAI_MODELS=[['nai-diffusion-5-full','V5 Full'],['nai-diffusion-5-curated',
 const NAI_SIZES=[[832,1216,'세로 832×1216'],[1216,832,'가로 1216×832'],[896,1152,'세로 896×1152'],[1152,896,'가로 1152×896'],[1024,1024,'정사각 1024×1024']];
 const NAI_FRAMES=[['full body','전신'],['cowboy shot','무릎 위'],['upper body','상반신'],['portrait','얼굴']];
 const FRAME_TAGS=/^(full body|cowboy shot|upper body|portrait|lower body|feet out of frame)$/i;
-const NAI_DEF={key:'',autoPrep:false,endpoint:NAI_ENDPOINT,model:'nai-diffusion-5-full',refModel:'nai-diffusion-4-5-full',steps:28,scale:6,cfgRescale:0.5,sampler:'k_euler_ancestral',noise:'karras',retries:3,timeoutSec:120,
+const NAI_DEF={key:'',autoPrep:false,endpoint:NAI_ENDPOINT,model:'nai-diffusion-5-full',refModel:'nai-diffusion-4-5-full',steps:28,scale:6,cfgRescale:0.5,sampler:'k_euler_ancestral',noise:'karras',retries:3,timeoutSec:120,saveFmt:'webp',webpQ:0.9,
   cutout:true,transparent:true,quality:true,qtags:'',prefix:'',styleId:'my_style',autoArt:'ask',
   sizes:{char:'832x1216',bg:'1216x832',prop:'1024x1024',cg:'1216x832',enemy:'1024x1024',illust:'832x1216',lbcg:'832x1216',map:'832x1216',icon:'1024x1024'},
   ref:{type:'character',strength:1,fidelity:1},
@@ -3734,7 +3734,21 @@ async function shrink(file,max){
     const b=await new Promise(r=>cv.toBlob(r,'image/webp',0.92)); return b||file;
   }catch(e){return file;}
 }
+/* 그림 저장 형식: WebP(기본)는 알파(반투명)를 유지하면서 용량을 크게 줄여요. PNG를 고를 때만 원본 그대로 저장해요 */
+async function imgToWebp(blob,q){
+  try{
+    if(!blob||!(blob instanceof Blob)||!/^image\/png/i.test(blob.type||'')) return blob;
+    const bmp=await createImageBitmap(blob);
+    const cv=document.createElement('canvas'); cv.width=bmp.width; cv.height=bmp.height;
+    cv.getContext('2d',{alpha:true}).drawImage(bmp,0,0);
+    try{ bmp.close&&bmp.close(); }catch(e2){}
+    const out=await new Promise(r=>cv.toBlob(r,'image/webp',q||0.9));
+    if(out&&out.size<blob.size*0.92) return out;
+    return blob;
+  }catch(e){ return blob; }
+}
 async function storeImage(o,blob,prefix){
+  try{ const sc=naiCfg(); if(blob instanceof Blob&&sc.saveFmt!=='png'){ const sd=blob.__seed; const w=await imgToWebp(blob,+sc.webpQ||0.9); if(w!==blob){ try{ w.__seed=sd; }catch(e3){} blob=w; } } }catch(e){}
   if(blob&&blob.__seed!=null) o.seed=blob.__seed; else if(blob) delete o.seed;
   if(ASSETS){ const r=await ASSETS.upload(blob); o.img={asset:r.id}; }
   else { await idbPut(IMGNS+o.id,blob); if(imgCache[o.id]) URL.revokeObjectURL(imgCache[o.id]); imgCache[o.id]=URL.createObjectURL(blob); o.img={idb:true}; }
@@ -4991,10 +5005,11 @@ function openNaiSet(){
     <div class="optbox" style="margin-top:10px;font-size:.8rem"><b>종류별 추가 태그</b> <span class="muted">아래 '뒤' 칸은 AI를 거치지 않고 그 종류 그림에 항상 붙어요. AI가 태그를 쓸 때 따를 지침(의상을 자세히, 일러스트 조명·구도 등)은</span> <button class="linkb" type="button" data-act="llmopen">글 AI 지침 → 그림 태그 지침</button></div>
     ${['char','illust','lbcg','enemy','bg','prop','cg'].map(k=>`<div class="g2"><div><label class="f" for="nai_p_${k}">${({char:'스탠딩',illust:'일러스트',lbcg:'돌파 CG',enemy:'적',bg:'배경',prop:'소품·무기',cg:'CG'})[k]} 뒤</label><input class="in" id="nai_p_${k}" value="${esc(c.parts[k].suffix)}"></div><div><label class="f" for="nai_n_${k}">네거티브 추가</label><input class="in" id="nai_n_${k}" value="${esc(c.parts[k].neg)}"></div></div>`).join('')}
     <label class="f" for="nai_neg">공통 네거티브</label><textarea class="in" id="nai_neg">${esc(c.neg)}</textarea>
+    <div class="g2"><div><label class="f" for="nai_fmt">그림 저장 형식</label><select class="in" id="nai_fmt">${opt([['webp','WebP — 용량 작음 · 반투명 유지'],['png','PNG — 원본 그대로']],c.saveFmt||'webp')}</select></div><div><label class="f" for="nai_wq">WebP 품질</label><select class="in" id="nai_wq">${opt([['0.95','높음'],['0.9','기본'],['0.85','작게']],String(c.webpQ||0.9))}</select></div></div>
     <label class="f" for="nai_cut">스탠딩·적 배경 자동 제거 (세부 조절은 각 이미지의 '배경 지우기'에서)</label><select class="in" id="nai_cut">${opt([['1','켜기'],['0','끄기']],c.cutout?'1':'0')}</select>
     <label class="f" for="nai_tp">V5 투명 배경으로 생성 (스탠딩·적·프랍. 흰 배경을 지울 필요가 없어져요. 레퍼런스를 쓰면 V4.5라서 꺼져요)</label><select class="in" id="nai_tp">${opt([['1','켜기'],['0','끄기']],c.transparent?'1':'0')}</select>${localStorage.getItem('starfall-nai-tperr')?`<p class="muted" style="margin:4px 0 0">최근 투명 생성 실패: ${esc(localStorage.getItem('starfall-nai-tperr'))}</p>`:''}
     <p class="muted" style="margin-top:8px">Opus 구독이면 1024×1024 이하 넓이, 28스텝 이하, 1장 생성에 Anlas가 들지 않아요. 레퍼런스와 img2img는 추가로 들 수 있어요.</p>
-    <div class="row" style="margin-top:14px"><button class="btn" data-act="naisave">저장</button><button class="btn ghost" data-act="naitest">연결 확인</button></div>`);
+    <div class="row" style="margin-top:14px"><button class="btn" data-act="naisave">저장</button><button class="btn ghost" data-act="naitest">연결 확인</button><button class="btn ghost" data-act="naiwebp">그림 WebP로 줄이기 (일괄)</button></div>`);
 }
 function readNai(){
   const old=naiCfg(), v=id=>$('#'+id).value.trim();
@@ -5003,7 +5018,7 @@ function readNai(){
   const parts={}; ['char','illust','lbcg','enemy','bg','prop','cg'].forEach(k=>{parts[k]={suffix:v('nai_p_'+k),neg:v('nai_n_'+k)};});
   return {key:v('nai_key'),endpoint:v('nai_ep')||NAI_ENDPOINT,model:v('nai_model')||NAI_DEF.model,refModel:v('nai_rmodel')||NAI_DEF.refModel,sampler:$('#nai_sampler').value,noise:$('#nai_noise').value,
     steps:num(v('nai_steps'),1,50,28),scale:num(v('nai_scale'),0,10,6),cfgRescale:num(v('nai_cfgr'),0,1,0),retries:num(v('nai_retry'),1,5,3),timeoutSec:old.timeoutSec,
-    provider:$('#nai_prov').value,comfy:{url:v('cf_url'),wf:$('#cf_wf').value.trim(),qtags:v('cf_q'),neg:v('cf_n'),timeoutSec:num(v('cf_t'),30,1200,300)},quality:$('#nai_q').value==='1',qtags:v('nai_qt'),cutout:$('#nai_cut').value==='1',transparent:$('#nai_tp').value==='1',prefix:v('nai_prefix'),neg:v('nai_neg'),autoArt:$('#nai_auto').value,
+    saveFmt:($('#nai_fmt')?$('#nai_fmt').value:'webp'),webpQ:+(($('#nai_wq')&&$('#nai_wq').value)||0.9),provider:$('#nai_prov').value,comfy:{url:v('cf_url'),wf:$('#cf_wf').value.trim(),qtags:v('cf_q'),neg:v('cf_n'),timeoutSec:num(v('cf_t'),30,1200,300)},quality:$('#nai_q').value==='1',qtags:v('nai_qt'),cutout:$('#nai_cut').value==='1',transparent:$('#nai_tp').value==='1',prefix:v('nai_prefix'),neg:v('nai_neg'),autoArt:$('#nai_auto').value,
     sizes:{char:$('#nai_sz_char').value,bg:$('#nai_sz_bg').value,prop:$('#nai_sz_prop').value,cg:$('#nai_sz_cg').value,enemy:$('#nai_sz_enemy').value,illust:$('#nai_sz_illust').value},cut:Object.assign({},old.cut),
     ref:{type:$('#nai_rt').value,strength:num(v('nai_rs'),0,1,1),fidelity:num(v('nai_rf'),0,1,1)},
     styles:[{id:'my_style',name:'내 그림체',tags:v('nai_stags'),neg:v('nai_sneg')}],styleId:'my_style',poses:poses.length?poses:NAI_DEF.poses,parts};
@@ -8785,6 +8800,22 @@ case 'sttab': STTAB=t.dataset.k||''; render(); $('#view').scrollTop=0; break;
       const p={id:'u'+uid(),name:nm.trim().slice(0,30),by:by.trim().slice(0,20),desc:'내가 만든 팩',tags:st.tags||'',neg:st.neg||'',qtags:c.qtags||'',steps:c.steps,scale:c.scale,cfgRescale:c.cfgRescale,sampler:c.sampler};
       const a=userPacks(); a.unshift(p); if(saveUserPacks(a)) toast('프리셋으로 저장했어요. 내보내기로 코드를 공유할 수 있어요'); openModal(packHTML()); break; }
   case 'naisave': { naiWrite(readNai()); closeModal(); render(); toast('그림 AI 설정을 저장했어요'); break; }
+  case 'naiwebp': { t.disabled=true;
+    try{
+      const keys=await idbKeys(); const targets=keys.filter(k=>!String(k).startsWith('a_'));
+      if(!targets.length){ toast('바꿀 그림이 없어요'); break; }
+      openModal(head('그림을 WebP로 줄이는 중')+`<p class="muted" id="nwStat" style="text-align:center;padding:16px 0">0 / ${targets.length}</p><p class="muted" style="font-size:.78rem;text-align:center">PNG 그림만 골라 반투명을 유지하며 용량을 줄여요.</p>`);
+      let done=0,conv=0,saved=0; const q=+(naiCfg().webpQ||0.9);
+      for(const k of targets){
+        try{ const b=await idbGet(k);
+          if(b instanceof Blob&&/^image\/png/i.test(b.type||'')){ const w=await imgToWebp(b,q); if(w!==b){ saved+=b.size-w.size; conv++; await idbPut(k,w); } }
+        }catch(e2){}
+        done++; const st=$('#nwStat'); if(st) st.textContent=done+' / '+targets.length+(conv?` · ${conv}장 · ${(saved/1048576).toFixed(1)}MB 절약`:'');
+      }
+      openModal(head('WebP 변환 끝')+`<p style="text-align:center;padding:8px 0"><b>${conv}장</b> 변환 · <b>${(saved/1048576).toFixed(1)}MB</b> 절약${conv?'':' (이미 다 WebP예요)'}</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">닫기</button></div>`);
+      if(conv) toast('새로 고침하면 화면에도 적용돼요');
+    }finally{ if(t.isConnected) t.disabled=false; }
+    break; }
   case 'saload': { const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; const tx=await f.text(); if($('#ap_sa')) $('#ap_sa').value=tx; try{ const j=JSON.parse(tx); if($('#ap_project')&&!$('#ap_project').value) $('#ap_project').value=j.project_id||''; toast('서비스 계정 키를 불러왔어요'); }catch(e){ toast('JSON 파일이 아니에요'); } }; inp.click(); break; }
   case 'cfload': { const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json'; inp.onchange=async()=>{ const f=inp.files[0]; if(!f) return; const tx=await f.text(); const box=$('#cf_wf')||$('#sw_cfwf'); if(box) box.value=tx; try{ const j=JSON.parse(tx); toast(Array.isArray(j.nodes)?'UI 형식이에요. Export (API)로 저장한 파일을 넣어 주세요':'워크플로를 불러왔어요 (노드 '+Object.keys(j).length+'개)'); }catch(e){ toast('JSON 파일이 아니에요'); } }; inp.click(); break; }
   case 'cftest': { const u=(($('#cf_url')||$('#sw_cfurl'))||{}).value; if(!u){toast('주소를 넣어 주세요');break;} t.disabled=true;
