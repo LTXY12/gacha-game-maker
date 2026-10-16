@@ -2377,7 +2377,7 @@ const NAI_SIZES=[[832,1216,'세로 832×1216'],[1216,832,'가로 1216×832'],[89
 const NAI_FRAMES=[['full body','전신'],['cowboy shot','무릎 위'],['upper body','상반신'],['portrait','얼굴']];
 const FRAME_TAGS=/^(full body|cowboy shot|upper body|portrait|lower body|feet out of frame)$/i;
 const NAI_DEF={key:'',autoPrep:false,endpoint:NAI_ENDPOINT,model:'nai-diffusion-5-full',refModel:'nai-diffusion-4-5-full',steps:28,scale:6,cfgRescale:0.5,sampler:'k_euler_ancestral',noise:'karras',retries:3,timeoutSec:120,saveFmt:'webp',webpQ:0.9,
-  cutout:true,transparent:true,quality:true,qtags:'',prefix:'',styleId:'my_style',autoArt:'ask',
+  cutout:true,transparent:true,quality:true,qtags:'',prefix:'',styleId:'my_style',
   sizes:{char:'832x1216',bg:'1216x832',prop:'1024x1024',cg:'1216x832',enemy:'1024x1024',illust:'832x1216',upper:'832x1216',scg:'832x1216',lbcg:'832x1216',map:'832x1216',icon:'1024x1024'},
   ref:{type:'character',strength:1,fidelity:1},
   styles:[{id:'my_style',name:'내 그림체',tags:'',neg:''}],
@@ -2454,6 +2454,8 @@ const ILK=k=>k==='illust'||k==='lbcg';
 const isV4p=m=>/^nai-diffusion-(?:4|5)(?:-|$)/.test(String(m||'').trim());
 const isV45=m=>/^nai-diffusion-4-5/.test(String(m||'').trim());
 function naiCfg(){let o=readShared(NKEY,'starfall-nai',['key','endpoint']);const r=Object.assign({},NAI_DEF,o);
+  /* 자동 그리기 기본값: NovelAI는 자동, 그 외 공급자는 물어보기 (직접 정한 값이 있으면 그대로) */
+  if(!r.autoArt) r.autoArt=r.provider?'ask':'auto';
   r.endpoint=String(r.endpoint||NAI_ENDPOINT).trim().replace(/^https?:\/\/api\.novelai\.net/i,'https://image.novelai.net')||NAI_ENDPOINT;
   r.parts={}; ['char','bg','prop','cg','enemy','illust','lbcg','map','icon'].forEach(k=>{r.parts[k]=Object.assign({},NAI_DEF.parts[k],(o.parts||{})[k]||{});});
   r.sizes=Object.assign({},NAI_DEF.sizes,o.sizes||{}); r.ref=Object.assign({},NAI_DEF.ref,o.ref||{});
