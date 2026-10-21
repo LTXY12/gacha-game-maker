@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <script>
 (function(){
-  var BUILT='2026.10.21.6'; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
+  var BUILT='2026.10.21.8'; var REQUIRED_APK='2026.10.21.6'; window.__REQUIRED_APK__=REQUIRED_APK; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
   function vc(a,b){a=String(a||'').split(/\D+/).map(Number);b=String(b||'').split(/\D+/).map(Number);for(var i=0;i<Math.max(a.length,b.length);i++){var x=a[i]||0,y=b[i]||0;if(x!==y)return x<y?-1:1;}return 0;}
   if(window.__LIVE__) return;
   if(window.indexedDB){window.__STORAGE_SHELL__=BUILT;return;}
@@ -1942,6 +1942,9 @@ img,video,canvas{max-width:100%}
 #preset-code-input{flex:1 1 0%;height:0;min-height:64px;min-width:0;width:100%;resize:none;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all;font-size:16px;line-height:1.4}
 #preset-code-error{flex-shrink:0;max-height:48px;overflow:auto;margin:0;color:var(--rose);font-size:.8rem;overflow-wrap:anywhere}
 .preset-code-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-top:4px}.preset-code-actions>.btn{min-height:44px;min-width:0;white-space:nowrap}.preset-code-actions>.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--sub)}
+
+/* Redraws restore positions explicitly rather than browser scroll anchoring. */
+#view,.sheet{overflow-anchor:none}
 </style>
 </head>
 <body>
@@ -1982,7 +1985,7 @@ var appConfirm=window.appConfirm||function(message){
   root.querySelector('#app-confirm-message').textContent=String(message||'계속 진행할까요?');
   let finished=false;const locked=[...document.body.children].filter(el=>el.tagName!=='SCRIPT').map(el=>[el,el.inert]);for(const [el]of locked)el.inert=true;
   root._finish=accepted=>{if(finished)return;finished=true;const current=typeof PJ!=='function'||PJ().active===project,connected=!focus||focus.isConnected;root.remove();for(const [el,old]of locked)el.inert=old;document.removeEventListener('keydown',key,true);if(focus?.isConnected)focus.focus({preventScroll:true});resolve(!!accepted&&current&&connected);};
-  function key(e){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();root._finish(false);}else if(e.key==='Tab'){const buttons=[...root.querySelectorAll('button')],i=buttons.indexOf(document.activeElement);e.preventDefault();buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length].focus();}}
+  function key(e){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();root._finish(false);}else if(e.key==='Tab'){const buttons=[...root.querySelectorAll('button')],i=buttons.indexOf(document.activeElement);e.preventDefault();buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length].focus({preventScroll:true});}}
   root.addEventListener('click',e=>{e.stopPropagation();const choice=e.target.closest('[data-confirm-choice]')?.dataset.confirmChoice;if(choice)root._finish(choice==='accept');});
   document.addEventListener('keydown',key,true);document.body.append(root);root.querySelector('[data-confirm-choice=cancel]').focus({preventScroll:true});
  });
@@ -4659,7 +4662,7 @@ function openPresetCode(kind,code){
  sheet.addEventListener('click',event=>{
   const button=event.target.closest('[data-preset-code-action]');if(!button)return;event.stopPropagation();if(!current()||committed)return;
   if(button.dataset.presetCodeAction==='cancel'){window.navBack();return;}
-  if(exporting){input.focus({preventScroll:true});input.select();return;}
+  if(exporting){input.focus({preventScroll:true});uiSelectText(input);return;}
   if(!input.value.trim())return;
   if(llm){
    const item=llmFromCode(input.value);if(!item){showError('코드를 읽지 못했어요. GGMLLM:으로 시작하는 코드 전체를 확인해 주세요.');return;}
@@ -4710,7 +4713,7 @@ function presetToCfg(id){ const s=allPresets().find(x=>x.id===id); if(!s) return
 function drPresetHTML(){ const cur=DR2.preset||''; return `<label class="f">그림체 프리셋</label><div class="dr-pres">${[{id:'',name:'지금 설정 그대로',desc:'설정 → 그림 AI의 그림체를 써요'},...allPresets()].map(s=>`<button type="button" class="dr-pre ${cur===s.id?'on':''}" data-act="drpreset" data-v="${s.id}">${s.id?pthumbHTML(s.id,'big'):''}<b>${esc(s.name)}</b><span>${esc(s.desc)}${s.by?` · 프리셋 제공: ${esc(s.by)}`:''}</span></button>`).join('')}</div><p class="muted" style="margin:4px 0 0;font-size:.76rem">고르면 그림 AI 설정(그림체·품질 태그·스텝·가이던스·샘플러)에 바로 적용되고, 이 게임의 그림체로 저장돼요.</p>`; }
 function applyStylePreset(id){ const s=allPresets().find(x=>x.id===id); if(!s) return; const set=(k,v)=>{ const e=$('#'+k); if(e) e.value=v; };
   set('nai_stags',s.tags); set('nai_sneg',s.neg); set('nai_qt',s.qtags); set('nai_q','1'); set('nai_steps',s.steps); set('nai_scale',s.scale); set('nai_cfgr',s.cfgRescale); set('nai_sampler',s.sampler);
-  toast(`「${s.name}」 프리셋을 채웠어요. 아래 '저장'을 눌러야 적용돼요`); const e=$('#nai_stags'); if(e) e.scrollIntoView({block:'center',behavior:'smooth'}); }
+  toast(`「${s.name}」 프리셋을 채웠어요. 아래 '저장'을 눌러야 적용돼요`);  }
 const NAI_QUALITY={'nai-diffusion-5-full':'very aesthetic, masterpiece, best quality','nai-diffusion-5-curated':'very aesthetic, masterpiece, best quality','nai-diffusion-4-5-full':'very aesthetic, masterpiece, no text','nai-diffusion-4-5-curated':'location, masterpiece, no text','nai-diffusion-4-full':'no text, best quality, very aesthetic, absurdres'};
 const ILK=k=>k==='illust'||k==='lbcg';
 const isV4p=m=>/^nai-diffusion-(?:4|5)(?:-|$)/.test(String(m||'').trim());
@@ -6273,7 +6276,7 @@ $('#file').addEventListener('change',async e=>{
       const l={id:'l'+uid(),kind:'cg',name:'삽화 '+k,prompt:'',cast:[],img:null}; await storeImage(l,await shrink(f,2200),'l:'); G.lib.push(l); mark('l:'+l.id);
       const pos=Math.min(uploadFor.pos==null?ta.value.length:uploadFor.pos,ta.value.length), v=ta.value, pre=v.slice(0,pos), post=v.slice(pos);
       const ins=(pre&&!pre.endsWith('\n')?'\n':'')+`[CG: ${l.name}]\n…\n[CG 끝]`+(post&&!post.startsWith('\n')?'\n':'');
-      ta.value=pre+ins+post; ta.focus(); try{ ta.setSelectionRange(pos+ins.length,pos+ins.length); }catch(e){} toast(`「${l.name}」을(를) 넣었어요. 저장을 눌러야 반영돼요`); }
+      ta.value=pre+ins+post; ta.focus({preventScroll:true}); try{ ta.setSelectionRange(pos+ins.length,pos+ins.length); }catch(e){} toast(`「${l.name}」을(를) 넣었어요. 저장을 눌러야 반영돼요`); }
     catch(err){ toast('이미지를 넣지 못했어요'); } return; }
   if(uploadFor.kind==='face'){ const c=charById(uploadFor.id); if(!c) return; try{ await addFaceFile(c,uploadFor.name,f,uploadFor.b); openFaces(c.id); toast(`표정 「${uploadFor.name}」${uploadFor.b==='up'?' 상반신':''}을(를) 넣었어요`); }catch(err){ toast('이미지를 올리지 못했어요'); } return; }
   if(uploadFor.kind==='weapon'){ const c=charById(uploadFor.id); if(!c||!c.weapon) return; toast('그림을 등록하는 중이에요'); try{ let ub=await shrink(f,2000); try{ const ai=await alphaInfo(ub); if(ai.border<0.5) ub=await cutoutWhite(ub); }catch(e){} await storeImage(c.weapon,ub,''); mark('c:'+c.id); render(); openChar(c.id); toast(T('weapon')+' 이미지를 등록했어요'); }catch(err){ toast('이미지를 올리지 못했어요'); } return; }
@@ -6481,7 +6484,7 @@ function bubbleHTML(l,c){
 function chatImgView(k){ const u=chatImgCache[k], ph=$('.phone'); if(!u||!ph) return; const old=$('.ph-menu'); if(old) old.remove();
   ph.insertAdjacentHTML('beforeend',`<div class="ph-menu ph-view" data-act="phmenuclose"><img src="${esc(u)}" alt="사진"><div class="row"><button class="btn sm" data-act="chatimgsave" data-k="${esc(k)}">저장</button><button class="btn sm ghost" data-act="phmenuclose">닫기</button></div></div>`); }
 async function chatImgB64(k){ try{ const b=await idbGetNS(k); if(!b) return undefined; const s=await shrink(b,1024); const bmp=await createImageBitmap(s), cv=document.createElement('canvas'); cv.width=bmp.width; cv.height=bmp.height; cv.getContext('2d').drawImage(bmp,0,0); const u=cv.toDataURL('image/jpeg',0.85); return [{mime:'image/jpeg',data:u.split(',')[1]}]; }catch(e){ return undefined; } }
-async function chatPhotoPick(f){ if(!f||!PH||!PH.fc) return; try{ const b=await shrink(f,1280), k='chat_'+uid(); await idbPut(IMGNS+k,b); chatImgCache[k]=URL.createObjectURL(b); PH.pendImg=k; phPendRender(); const i=$('#fcIn'); if(i){ i.placeholder='사진과 함께 보낼 말 (비워도 돼요)'; i.focus(); } }catch(e){ toast('사진을 불러오지 못했어요'); } }
+async function chatPhotoPick(f){ if(!f||!PH||!PH.fc) return; try{ const b=await shrink(f,1280), k='chat_'+uid(); await idbPut(IMGNS+k,b); chatImgCache[k]=URL.createObjectURL(b); PH.pendImg=k; phPendRender(); const i=$('#fcIn'); if(i){ i.placeholder='사진과 함께 보낼 말 (비워도 돼요)'; i.focus({preventScroll:true}); } }catch(e){ toast('사진을 불러오지 못했어요'); } }
 function phPendRender(){ const w=$('#phPend'); if(!w) return; const k=PH&&PH.pendImg; w.hidden=!k; w.innerHTML=k?`<img src="${esc(chatImgCache[k]||'')}" alt="보낼 사진"><span>이 사진을 보낼게요</span><button class="btn sm ghost" data-act="phpendx" aria-label="사진 빼기">✕</button>`:''; }
 (function(){ const i=document.createElement('input'); i.type='file'; i.id='chatfile'; i.accept='image/*'; i.hidden=true; document.body.appendChild(i);
   i.addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; chatPhotoPick(f); }); })();
@@ -6498,7 +6501,7 @@ function openRoom(cid,opt){
   if(!PH.sel) phScroll(); f.unread=0; mark('prog');
   if(PH.sel) return;
   if(act){ act.s.t0=act.s.t0||Date.now(); phPlay(act.t,c,act.s,token); }
-  else setTimeout(()=>{ const i=$('#fcIn'); if(i&&!IS_NATIVE&&!i.disabled) i.focus(); },50);
+  else setTimeout(()=>{ const i=$('#fcIn'); if(i&&!IS_NATIVE&&!i.disabled) i.focus({preventScroll:true}); },50);
 }
 function phMenu(cid){ const c=charById(cid); if(!c) return; const old=$('.ph-menu'); if(old){ old.remove(); return; }
   const n=roomItems(cid).length, nb=roomLastBlock(cid).length;
@@ -7121,7 +7124,7 @@ async function heroTags(hr){ const r=await aiJSON(`플레이어 캐릭터의 외
   let tags=String((r&&r.tags)||'').trim(); if(!tags) return '';
   if(hr.hide) tags=joinTags(tagList(tags).filter(t=>!EYE_TAG.test(tagKey(t))).join(', '),'hair over eyes, bangs covering eyes, long bangs');
   return tags; }
-function refreshPlayerForm(){ const w=$('#pfWrap'); if(w) w.innerHTML=playerFormHTML(); }
+function refreshPlayerForm(){ const w=$('#pfWrap'); if(w){const sheet=w.closest('.sheet')||$('#view'),position=uiScrollCapture(sheet);w.innerHTML=playerFormHTML();uiScrollRestore(sheet,position);} }
 async function playerDraw(btn){ readPlayerForm(); const p=P(); if(!p.look){ toast('외모를 먼저 적어 주세요'); return; } if(!imgReady()){ toast(imgNeed()); return; }
   const lab=btn.textContent; btn.disabled=true; btn.textContent='태그 만드는 중…';
   try{ const tags=await heroTags({gender:p.genderTxt,look:p.look,hide:p.hideEyes}); if(!tags){ toast('태그를 만들지 못했어요. 다시 눌러 주세요'); return; }
@@ -7236,7 +7239,39 @@ const PHONE_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 function subLocked(){ try{ return !!(typeof G!=='undefined'&&G&&G.meta&&G.meta.subscr); }catch(e){ return false; } }
 function playMode(){ if(subLocked()) return true; try{ return appStorage.getItem('ggm-play')==='1'; }catch(e){ return false; } }
 const PLAY_HIDE_ST=['lib','text','img','live','conn'];
-function render(){ setTimeout(()=>{ try{ fitLobby(); }catch(e){} },0); document.body.classList.toggle('play',playMode()); if(playMode()&&PLAY_HIDE_ST.includes(STTAB)) STTAB='';
+/* UI_SCROLL_MODULE */
+/* Keep local actions at their current position; navigation owns intentional resets. */
+var UI_PAGE_SCROLL_ROUTE=null,UI_PAGE_SCROLL_GAME=null;
+function uiScrollPath(root,node){
+ if(node===root)return [];
+ const path=[];for(let el=node;el&&el!==root;el=el.parentElement){if(!el.parentElement)return null;path.unshift([...el.parentElement.children].indexOf(el));}
+ return path;
+}
+function uiScrollResolve(root,entry){
+ if(!root)return null;
+ let node=entry.id?[root,...root.querySelectorAll('[id]')].find(el=>el.id===entry.id):null;
+ if(!node){node=root;for(const i of entry.path||[]){node=node?.children[i];if(!node)return null;}}
+ return node?.tagName===entry.tag?node:null;
+}
+function uiScrollCapture(root){
+ if(!root)return null;
+ const nodes=[root,...root.querySelectorAll('*')],rows=[],details=[];
+ for(const node of nodes){if(node!==root&&!node.scrollTop&&!node.scrollLeft&&node.tagName!=='DETAILS')continue;const entry={id:node.id||'',path:uiScrollPath(root,node),tag:node.tagName};
+  if(node===root||node.scrollTop||node.scrollLeft)rows.push({...entry,top:node.scrollTop,left:node.scrollLeft});
+  if(node.tagName==='DETAILS')details.push({...entry,open:node.open});
+ }
+ return {rows,details};
+}
+function uiScrollRestore(root,state){
+ if(!root||!state)return;
+ for(const entry of state.details||[]){const node=uiScrollResolve(root,entry);if(node)node.open=entry.open;}
+ for(const entry of state.rows||[]){const node=uiScrollResolve(root,entry);if(node){node.style.overflowAnchor='none';node.scrollTop=entry.top;node.scrollLeft=entry.left;}}
+}
+function uiPageScrollKey(){return JSON.stringify([PJ().active,tab,tab==='studio'?STTAB:'',tab==='evd'?P().curEvent:'',tab==='ops'?OPS_CH:'']);}
+function uiSelectText(field){if(!field)return;const root=field.closest('.sheet')||document.getElementById('view'),state=uiScrollCapture(root);field.focus({preventScroll:true});try{field.setSelectionRange(0,field.value.length);}catch(e){field.select();}uiScrollRestore(root,state);}
+
+/* /UI_SCROLL_MODULE */
+function render(){ const scrollKey=uiPageScrollKey(),viewBefore=$('#view'),viewState=UI_PAGE_SCROLL_ROUTE===scrollKey&&UI_PAGE_SCROLL_GAME===G?uiScrollCapture(viewBefore):null; setTimeout(()=>{ try{ fitLobby(); }catch(e){} },0); document.body.classList.toggle('play',playMode()); if(playMode()&&PLAY_HIDE_ST.includes(STTAB)) STTAB='';
   // 심연 탐사는 야영지에서 저장해야만 나갔다 올 수 있어요. 다른 길로 나가면 탐사가 끝나요.
   if(PREVTAB==='abyss'&&tab!=='abyss'){ try{ const r=RG().run; if(r&&!r.saved) r.left=true; }catch(e){} } PREVTAB=tab;
   if(tab==='lobby'&&typeof mailTick==='function') mailTick();
@@ -7250,6 +7285,7 @@ function render(){ setTimeout(()=>{ try{ fitLobby(); }catch(e){} },0); document.
   $('#view').innerHTML=(F[tab]||lobbyHTML)();
   document.body.classList.toggle('on-lobby',tab==='lobby'); document.body.classList.toggle('abyss-full',tab==='abyss');
   if(typeof applyDesk==='function') applyDesk();
+  if(viewState)uiScrollRestore($('#view'),viewState);else $('#view').scrollTop=0;UI_PAGE_SCROLL_ROUTE=scrollKey;UI_PAGE_SCROLL_GAME=G;
 }
 const pageHead=(ko,en,back)=>`<div class="phead">${back?`<button class="back" data-act="go" data-to="${back}" aria-label="뒤로">‹</button>`:''}<div><i>${en}</i><h2>${esc(ko)}</h2></div></div>`;
 function nextStage(){ const main=G.chapters.filter(c=>c.kind==='main'); for(const [ci,ch] of main.entries()) for(const [si,s] of ch.stages.entries()) if(!P().cleared[s.id]) return {ch,s,code:(ci+1)+'-'+(si+1)}; return null; }
@@ -7973,6 +8009,7 @@ function swSave(){
   if(SW.fish||SW.el){ const o=SND(); if(SW.fish) o.fishKey=SW.fish; if(SW.el) o.elKey=SW.el; appStorage.setItem(SKEY,JSON.stringify(o)); }
 }
 function renderSetup(){
+  const oldSetup=$('#ov .setup'),setupPosition=oldSetup?.dataset.step===String(SW.step)?uiScrollCapture($('#ov')):null;
   const st=SW.step, dots=[0,1,2,3,4,5].map(i=>`<i class="${i<=st?'on':''}"></i>`).join(''), a=SW.ai, help=SETUP_HELP[a.type];
   const card=[
     `<div class="sw-logo sw-splash"><i>GACHA GAME MAKER</i><b>가챠 게임 메이커</b><span>내가 정한 세계관으로 만드는 나만의 가챠 게임</span></div>
@@ -8015,7 +8052,8 @@ function renderSetup(){
      <div class="sw-opt"><b>🔗 구독 주소로 받기</b><span>다른 사람이 게시한 게임을 받아서 플레이해요. AI 키가 없어도 돼요.</span><input class="in" id="sw_sub" placeholder="GGMSUB:주인/저장소/브랜치/games/…" autocomplete="off" style="margin-top:8px"><button class="btn ghost block" data-act="swsub" style="margin-top:8px">구독하고 시작</button></div>
      <div class="sw-opt"><b>☆ 샘플 게임 「낙성계약」</b><span>바로 해 볼 수 있는 기본 게임이에요.</span><button class="btn ghost block" data-act="swdone" style="margin-top:10px">샘플로 시작</button></div>
      <div class="sw-btns"><button class="btn ghost" data-act="swprev">이전</button></div>`][st];
-  $('#ov').innerHTML=`<div class="setup"><div class="sw-bg" style="${bgStyle(P().titleBg||'낙성 분화구')}"></div><div class="sw-card"><div class="sw-dots">${dots}</div>${card}</div></div>`;
+  $('#ov').innerHTML=`<div class="setup" data-step="${st}"><div class="sw-bg" style="${bgStyle(P().titleBg||'낙성 분화구')}"></div><div class="sw-card"><div class="sw-dots">${dots}</div>${card}</div></div>`;
+  if(setupPosition)uiScrollRestore($('#ov'),setupPosition);
 }
 
 /* =========================================================
@@ -8201,7 +8239,7 @@ function openChar(id){
     <div class="cs-tabs">${[['equip','장비·스킬'],['story','스토리'],['look','외형'],['info','정보']].map(([k,l])=>`<button class="${CS_TAB===k?'on':''}" data-act="cstab" data-k="${k}">${l}</button>`).join('')}</div>
     <div class="cs-body">${sec('equip',equip)}${sec('story',story)}${sec('look',look)}${sec('info',info)}</div>
   </div>`,false,'cs-sheet');
-  const s2=$('#modal .sheet'); if(s2){ s2.dataset.cid=id; s2.scrollTop=keep; }
+  const s2=$('#modal .sheet'); if(s2){ s2.dataset.cid=id; if(old)s2.scrollTop=keep; }
   if(o&&o.dup>=5&&o.cgNew&&lbs){ o.cgNew=false; mark('prog'); setTimeout(()=>lbReveal(c),500); }
 }
 function openCharEdit(id){
@@ -8338,7 +8376,7 @@ async function openFormation(stage,ctx,startAct){
       <select class="in" id="fsort" style="max-width:120px">${opt([['power','전투력순'],['lv','레벨순'],['match','상성순']],FORM.sort)}</select></div>
     <div class="froster">${list.map(c=>{const on=squadSel.includes(c.id),b=busy.has(c.id),m=matchup(c,en);return `<button class="fr r${c.rarity} ${on?'on':''} ${b?'busy':''}" data-act="fpick" data-id="${c.id}" ${b?'disabled':''} style="--ec:${ECOL[c.elem]}"><div class="fr-art">${art(c)}</div><span class="el" style="--ec:${ECOL[c.elem]}">${esc(c.elem)}</span>${b?'<em class="busy">파견</em>':m.good>m.bad?'<em class="adv">유리</em>':m.bad>m.good?'<em class="dis">불리</em>':''}${on?`<em class="num">${squadSel.indexOf(c.id)+1}</em>`:''}<b>${esc(c.name)}</b><span>Lv.${own(c.id).lv} · ${nf(charPower(c))}</span></button>`;}).join('')||'<p class="muted">보유한 '+T('crew')+'이(가) 없어요.</p>'}</div>
     <div class="row" style="margin-top:14px"><button class="btn block" data-act="${startAct}" ${FORM.ctx.extra||''} ${squadSel.length?'':'disabled'}>출격 (${squadSel.length}/4)</button></div>
-    ${FORM.ctx.storyBtns||''}`);
+    ${FORM.ctx.storyBtns||''}`,false,'','formation:'+FORM.key+':'+FORM.ctx.kind);
 }
 function refreshForm(){ if(FORM) openFormation(FORM.stage,FORM.ctx,FORM.startAct); }
 function autoSquad(stage){
@@ -10236,8 +10274,47 @@ async function sha256hex(text){const b=await crypto.subtle.digest('SHA-256',new 
 function openUrl(url){ try{ if(CAP&&CAP.Browser){ CAP.Browser.open({url}); return; } }catch(e){} let w=null; try{ w=window.open(url,'_blank'); }catch(e){} if(w){ try{ w.opener=null; }catch(e){} return; }
   openModal(`${head('링크 열기')}<p class="muted" style="margin:0 0 8px">새 창을 열지 못했어요. 아래 링크를 눌러 열거나 복사해서 브라우저에 붙여 넣어 주세요.</p><a class="btn block" href="${esc(url)}" target="_blank" rel="noopener">열기</a><div class="code-box" style="margin:10px 0;padding:8px;word-break:break-all;user-select:all">${esc(url)}</div><div class="row"><button class="btn ghost" data-act="copy" data-text="${esc(url)}">주소 복사</button></div>`); }
 let UPD=null;
+/* UPDATE_GUIDANCE_MODULE */
+/* APK requirements are declared by releases, never guessed from arbitrary code differences. */
+function updateHTMLMinimum(html){
+ const text=String(html||'');const declared=(text.match(/var REQUIRED_APK='([^']+)'/)||[])[1];
+ if(declared)return declared;
+ // Compatibility with 2026.10.21.6, published before the explicit marker existed.
+ const legacy=(text.match(/versionCompare\(window\.__SHELL__,'([^']+)'\)/)||[])[1];
+ if(legacy)return legacy;
+ if(text.includes('text/ggm-main')&&text.includes('ggm-durable-storage'))return '2026.10.21.4';
+ return '';
+}
+function updateMinimum(man,html){
+ const versions=[man?.apk?.minShell,updateHTMLMinimum(html),man?.build===APP_BUILD?window.__REQUIRED_APK__:''].filter(Boolean).map(String);
+ if(versions.some(v=>!/^\d+(?:\.\d+){1,5}$/.test(v)))throw Error('최소 APK 버전 정보가 잘못되었습니다. 배포 정보를 확인해 주세요.');
+ return versions.sort(verCmp).at(-1)||'';
+}
+function updateCheckRecord(man,repo,branch,result,html){const o=LV();o.lastCheck={at:Date.now(),running:APP_BUILD,installed:window.__SHELL__||APP_BUILD,remote:String(man.build||''),minimum:updateMinimum(man,html),repo,branch,result};saveLV(o);}
+function updateCurrentMessage(remote){return verCmp(remote,APP_BUILD)<0?'현재 실행 '+APP_BUILD+' · 확인한 배포본 '+remote+'입니다. 업데이트 저장소와 브랜치를 확인해 주세요.':'이미 최신 버전이에요 ('+APP_BUILD+')';}
+function updateCheckHTML(o){const r=o.lastCheck;if(!r)return '';return `<div class="panel" data-update-check><b>최근 업데이트 확인</b><p>실행 버전: ${esc(r.running)}<br>설치 APK: ${esc(r.installed)}<br>확인한 배포본: ${esc(r.remote)}<br>필요 APK: ${esc(r.minimum||'별도 요구 없음')}</p><p class="muted">${esc(r.repo)} · ${esc(r.branch)}<br>${esc(r.result)} · ${esc(new Date(r.at).toLocaleString())}</p></div>`;}
+function updateReleaseURL(man){const url=String(man?.apk?.url||'');const match=url.match(/^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/releases(?:\/|$)/i);return 'https://github.com/'+(match?match[1]:RELEASE_REPO)+'/releases/latest';}
+function updateAPKRequired(man,html,repo=updRepo(LV()),branch=LV().branch||'main'){
+ let minimum;try{minimum=updateMinimum(man,html);}catch(e){UPD=null;toast(e.message);return true;}const installed=window.__SHELL__||APP_BUILD;
+ if(!minimum||verCmp(installed,minimum)>=0)return false;
+ UPD=null;updateCheckRecord(man,repo,branch,'새 APK 설치 필요',html);
+ openModal(`${head('새 APK 설치가 필요해요')}<p>이번 업데이트는 앱의 시작 방식·저장 기능 또는 안드로이드 기능과의 호환 조건이 바뀌어, 앱 안에서 받는 패치만으로는 적용할 수 없어요.</p><div class="panel"><p>현재 설치 APK: <b>${esc(installed)}</b><br>필요한 APK: <b>${esc(minimum)} 이상</b><br>업데이트 버전: <b>${esc(man.build)}</b></p></div><p><b>기존 앱을 삭제하지 말고 새 APK를 내려받아 덮어 설치해 주세요.</b> 같은 공식 앱과 서명으로 설치하면 기존 게임 데이터를 유지합니다. 앱 삭제·데이터 초기화는 하지 마세요.</p><p>GitHub 릴리즈 화면의 <b>Assets(첨부 파일)</b>에서 <b>gacha-game-maker.apk</b>를 내려받고, 다운로드한 APK 파일을 열어 설치해 주세요. Source code ZIP은 앱 설치 파일이 아닙니다.</p>${notesHTML(man)}<div class="row"><button class="btn" data-act="apkget" data-url="${esc(updateReleaseURL(man))}">GitHub 릴리즈 열기</button><button class="btn ghost" data-act="close">나중에</button></div>`);
+ return true;
+}
+async function updateDownloadHTML(base,path,man){
+ let response;try{response=await http(base+path+'?t='+Date.now(),{timeout:60000,binary:true});}catch(e){throw Error('업데이트 실행 파일을 확인하지 못했어요. 다시 확인해 주세요.');}
+ if(response.status>=400)throw Error('업데이트 실행 파일을 받지 못했어요. 배포 경로를 확인해 주세요.');
+ const raw=response.bytes,html=raw?new TextDecoder().decode(raw):String(response.text||'');
+ if(!/APP_BUILD/.test(html)||!/<\/html>/i.test(html))throw Error('받은 파일이 게임 파일이 아니에요.');
+ const build=(html.match(/var BUILT='([^']+)'/)||[])[1];if(!build||build!==String(man.build))throw Error('배포 정보와 실행 파일의 버전이 달라요. 잠시 뒤 다시 확인해 주세요.');
+ if(man.sha256){const digest=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');let ok;
+ try{ok=raw?(await digest(raw))===String(man.sha256).toLowerCase():(await Promise.all([html,html+'\n'].map(sha256hex))).includes(String(man.sha256).toLowerCase());}catch(e){throw Error('업데이트 파일의 무결성을 확인하지 못했어요.');}
+ if(!ok)throw Error('받은 파일이 손상됐거나 배포 정보와 달라요. 다시 확인해 주세요.');}
+ return html;
+}
+
 async function checkUpdate(manual){
-  const o=LV(), repo=updRepo(o), branch=(o.branch||'main').trim();
+  UPD=null;const o=LV(), repo=updRepo(o), branch=(o.branch||'main').trim();
   if(o.token) return checkUpdatePrivate(manual);
   let raw=`https://raw.githubusercontent.com/${repo}/${branch}/`;
   let man=null;
@@ -10248,18 +10325,54 @@ async function checkUpdate(manual){
   if(!man||!man.build){ if(o.repo) return checkUpdatePrivate(manual); if(manual) toast('업데이트 정보를 받지 못했어요. 인터넷을 확인해 주세요'); return; }
   if(man.feedback){ o.feedback=String(man.feedback); saveLV(o); }
   if(man.notice&&man.notice.id&&man.notice.title&&o.noticeSeen!==String(man.notice.id)){ o.noticeSeen=String(man.notice.id); saveLV(o); const nb=String(man.notice.body||''); sendMail({kind:'notice',from:'운영팀',title:String(man.notice.title).slice(0,60),body:nb,days:30}); const L=P().live; L.notices=L.notices.filter(x=>!x.dev); L.notices.unshift({dev:true,at:Date.now(),title:String(man.notice.title).slice(0,60),lines:nb.split('\n').map(x=>x.trim()).filter(Boolean)}); L.notices=L.notices.slice(0,30); mark('prog'); render(); toast('새 공지가 도착했어요'); }
-  const shellOld=man.apk&&man.apk.minShell&&verCmp(window.__SHELL__||APP_BUILD,man.apk.minShell)<0;
+  if(updateAPKRequired(man,'',repo,branch))return;
   const newer=verCmp(man.build,APP_BUILD)>0;
-  if(shellOld){ openModal(`${head('새 앱 설치가 필요해요')}<p>이번 업데이트는 앱 자체가 바뀌어서 새 APK를 설치해야 해요. 설치해도 데이터는 그대로예요(지우고 다시 깔면 사라져요).</p>${notesHTML(man)}<div class="row" style="margin-top:12px"><button class="btn" data-act="apkget" data-url="${esc(man.apk.url||('https://github.com/'+repo+'/releases/latest'))}">APK 받기</button><button class="btn ghost" data-act="close">나중에</button></div>`); return; }
-  if(!newer){ if(manual) toast('이미 최신 버전이에요 ('+APP_BUILD+')'); return; }
+  if(!newer){updateCheckRecord(man,repo,branch,'최신 또는 배포본보다 새 버전');if(manual)toast(updateCurrentMessage(man.build));return;}
   if(o.skip===man.build&&!manual) return;
   const isBad=!!o.badBuild&&o.badBuild===man.build; if(isBad&&!manual) return;
-  UPD={man,raw,path:(man.html||o.path||'www/index.html').replace(/^\//,'')};
+  const path=(man.html||o.path||'www/index.html').replace(/^\//,'');let html;
+  try{html=await updateDownloadHTML(raw,path,man);}catch(e){updateCheckRecord(man,repo,branch,'확인 실패: '+e.message);if(manual)toast(e.message);return;}
+  if(updateAPKRequired(man,html,repo,branch))return;
+  updateCheckRecord(man,repo,branch,'웹 패치 가능',html);UPD={man,raw,path,html};
   if(isBad){ openModal(`${head('이 버전은 전에 문제가 있었어요',`<span class="muted">${esc(man.build)}</span>`)}<p>이 버전은 이 기기에서 제대로 실행되지 않아서 설치 버전으로 돌아왔었어요. 새 버전이 나오면 자동으로 다시 알려 드려요.</p><div class="row" style="margin-top:12px"><button class="btn ghost" data-act="updget">그래도 받기</button><button class="btn" data-act="close">닫기</button></div>`); return; }
   if(o.mode==='silent'&&!manual) return applyUpdate(true);
   openModal(`${head('업데이트가 있어요',`<span class="muted">${esc(APP_BUILD)} → <b>${esc(man.build)}</b></span>`)}${notesHTML(man)}
     <div class="row" style="margin-top:12px"><button class="btn" data-act="updget">받기</button><button class="btn ghost" data-act="updskip">이번 버전 건너뛰기</button><button class="btn ghost" data-act="close">나중에</button></div>`);
 }
+async function applyUpdate(silent){
+  const u=UPD;if(!u)return;let html;
+  try{html=u.html||await updateDownloadHTML(u.raw,u.path,u.man);}catch(e){toast(e.message);return;}
+  if(updateAPKRequired(u.man,html,updRepo(LV()),LV().branch||'main')){UPD=null;return;}
+  const build=(html.match(/var BUILT='([^']+)'/)||[])[1]||u.man.build; try{ appStorage.setItem('ggm-upd-notes',JSON.stringify(Array.isArray(u.man.notes)?u.man.notes:String(u.man.notes||'').split('|').map(x=>x.trim()).filter(Boolean))); }catch(e){}
+  try{ await appStorage.saveLive(html); }catch(e){ toast('업데이트 저장 실패: '+(e.message||'저장 공간을 확인해 주세요')); return; }
+  const o=LV(); Object.assign(o,{on:true,prevBuild:o.build||'',build,boots:0,failed:false,at:Date.now()}); if(o.badBuild===build) delete o.badBuild; saveLV(o); await flush();
+  if(silent){ toast('새 버전을 받았어요. 다음 실행부터 적용돼요'); return; }
+  openModal(`${head('업데이트를 받았어요')}<p>버전 <b>${esc(build)}</b>. 다시 시작하면 적용돼요. 문제가 생기면 설정 → 앱 업데이트에서 이전 버전으로 되돌릴 수 있어요.</p><div class="row" style="margin-top:12px"><button class="btn" data-act="reload">지금 다시 시작</button><button class="btn ghost" data-act="close">나중에</button></div>`);
+}
+async function checkUpdatePrivate(manual){
+  UPD=null;const o=LV(); if(!o.repo){ if(manual) toast('업데이트 설정에서 GitHub 저장소를 먼저 넣어 주세요'); return; }
+  const base=`https://api.github.com/repos/${o.repo.trim()}/contents/${(o.path||'www/index.html').trim()}?ref=${encodeURIComponent((o.branch||'main').trim())}`;
+  const h={Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}; if(o.token) h.Authorization='Bearer '+o.token.trim();
+  let j; try{ j=okJSON(await http(base,{headers:h,timeout:30000})); }
+  catch(e){ if(manual) toast('업데이트 확인 실패. '+(e.code==='bad_key'?'토큰 권한을 확인해 주세요.':e.code==='model_not_found'?'저장소 이름, 브랜치, 경로를 확인해 주세요.':(e.message||''))); return; }
+  o.checked=Date.now(); saveLV(o);
+  let html='';
+  try{ if(j.content&&j.encoding==='base64') html=new TextDecoder().decode(b64ToBytes(j.content.replace(/\s/g,'')));
+    else { const r=await http(base,{headers:Object.assign({},h,{Accept:'application/vnd.github.raw+json'}),timeout:60000}); html=r.text||''; } }catch(e){}
+  if(!/APP_BUILD/.test(html)||!/<\/html>/i.test(html)){ if(manual) toast('받은 파일이 게임 파일이 아니에요. 경로를 확인해 주세요.'); return; }
+  const build=(html.match(/var BUILT='([^']+)'/)||[])[1]||'';
+  const man={build,apk:{url:'https://github.com/'+RELEASE_REPO+'/releases/latest/download/gacha-game-maker.apk'}};
+  if(updateAPKRequired(man,html,o.repo,o.branch||'main'))return;
+  if(build&&verCmp(build,APP_BUILD)<=0){o.sha=j.sha;saveLV(o);updateCheckRecord(man,o.repo,o.branch||'main','최신 또는 배포본보다 새 버전',html);if(manual)toast(updateCurrentMessage(build));return;}
+  updateCheckRecord(man,o.repo,o.branch||'main','웹 패치 가능',html);
+  if(build&&o.badBuild===build&&!manual) return;
+  try{ await appStorage.saveLive(html); }
+  catch(e){ toast('업데이트 저장 실패: '+(e.message||'저장 공간을 확인해 주세요')); return; }
+  Object.assign(o,{on:true,sha:j.sha,prevBuild:o.build||'',build,boots:0,failed:false,at:Date.now()}); saveLV(o);
+  openModal(`${head('새 버전을 받았어요')}<p>버전 <b>${esc(build||'알 수 없음')}</b>. 앱을 다시 시작하면 적용돼요.</p><div class="row" style="margin-top:12px"><button class="btn" data-act="reload">지금 다시 시작</button><button class="btn ghost" data-act="close">나중에</button></div>`);
+}
+
+/* /UPDATE_GUIDANCE_MODULE */
 function onPcServer(){ const pc=PCS(); return !!(pc&&location.origin===pc.base); }
 let WEBUPD=null;
 async function checkWebUpdate(manual){ if(IS_NATIVE) return; const o=LV(); let man=null;
@@ -10288,46 +10401,15 @@ async function checkNoticeWeb(){
   if(man.notice&&man.notice.id&&man.notice.title&&o.noticeSeen!==String(man.notice.id)){ o.noticeSeen=String(man.notice.id); saveLV(o); const nb=String(man.notice.body||''); sendMail({kind:'notice',from:'운영팀',title:String(man.notice.title).slice(0,60),body:nb,days:30}); const L=P().live; L.notices=L.notices.filter(x=>!x.dev); L.notices.unshift({dev:true,at:Date.now(),title:String(man.notice.title).slice(0,60),lines:nb.split('\n').map(x=>x.trim()).filter(Boolean)}); mark('prog'); if(tab==='lobby') render(); }
 }
 function notesHTML(man){const n=Array.isArray(man.notes)?man.notes:String(man.notes||'').split('|').map(x=>x.trim()).filter(Boolean);return n.length?`<div class="panel" style="margin:8px 0"><h3>바뀐 점</h3><ul style="margin:0;padding-left:18px">${n.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:'';}
-async function applyUpdate(silent){
-  const u=UPD; if(!u) return; let html='';
-  let raw=null; try{ const r=await http(u.raw+u.path+'?t='+Date.now(),{timeout:60000,binary:true}); if(r.status>=400) throw 0; raw=r.bytes; html=raw?new TextDecoder().decode(raw):(r.text||''); }catch(e){ toast('업데이트 파일을 받지 못했어요'); return; }
-  if(!/APP_BUILD/.test(html)||!/<\/html>/i.test(html)){ toast('받은 파일이 게임 파일이 아니에요'); return; }
-  if(u.man.sha256){ try{ const want=String(u.man.sha256).toLowerCase(), dig=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(x=>x.toString(16).padStart(2,'0')).join('');
-    /* 원본 바이트로 비교해요. 글자로만 받았으면 끝 줄바꿈이 빠졌을 수 있어서 그 경우도 봐요 */
-    const ok=raw?(await dig(raw))===want:(await Promise.all([html,html+'\n'].map(sha256hex))).includes(want);
-    if(!ok){ toast('받은 파일이 손상됐어요. 잠시 뒤 다시 시도해 주세요'); return; } }catch(e){} }
-  const build=(html.match(/var BUILT='([^']+)'/)||[])[1]||u.man.build; try{ appStorage.setItem('ggm-upd-notes',JSON.stringify(Array.isArray(u.man.notes)?u.man.notes:String(u.man.notes||'').split('|').map(x=>x.trim()).filter(Boolean))); }catch(e){}
-  try{ await appStorage.saveLive(html); }catch(e){ toast('업데이트 저장 실패: '+(e.message||'저장 공간을 확인해 주세요')); return; }
-  const o=LV(); Object.assign(o,{on:true,prevBuild:o.build||'',build,boots:0,failed:false,at:Date.now()}); if(o.badBuild===build) delete o.badBuild; saveLV(o); await flush();
-  if(silent){ toast('새 버전을 받았어요. 다음 실행부터 적용돼요'); return; }
-  openModal(`${head('업데이트를 받았어요')}<p>버전 <b>${esc(build)}</b>. 다시 시작하면 적용돼요. 문제가 생기면 설정 → 앱 업데이트에서 이전 버전으로 되돌릴 수 있어요.</p><div class="row" style="margin-top:12px"><button class="btn" data-act="reload">지금 다시 시작</button><button class="btn ghost" data-act="close">나중에</button></div>`);
-}
+
 function LV(){try{return JSON.parse(appStorage.getItem(LVKEY))||{};}catch(e){return {};}}
 function saveLV(o){appStorage.setItem(LVKEY,JSON.stringify(o));}
-async function checkUpdatePrivate(manual){
-  const o=LV(); if(!o.repo){ if(manual) toast('업데이트 설정에서 GitHub 저장소를 먼저 넣어 주세요'); return; }
-  const base=`https://api.github.com/repos/${o.repo.trim()}/contents/${(o.path||'www/index.html').trim()}?ref=${encodeURIComponent((o.branch||'main').trim())}`;
-  const h={Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}; if(o.token) h.Authorization='Bearer '+o.token.trim();
-  let j; try{ j=okJSON(await http(base,{headers:h,timeout:30000})); }
-  catch(e){ if(manual) toast('업데이트 확인 실패. '+(e.code==='bad_key'?'토큰 권한을 확인해 주세요.':e.code==='model_not_found'?'저장소 이름, 브랜치, 경로를 확인해 주세요.':(e.message||''))); return; }
-  o.checked=Date.now(); saveLV(o);
-  if(o.sha&&o.sha===j.sha){ if(manual) toast('이미 최신 버전이에요'); return; }
-  let html='';
-  try{ if(j.content&&j.encoding==='base64') html=new TextDecoder().decode(b64ToBytes(j.content.replace(/\s/g,'')));
-    else { const r=await http(base,{headers:Object.assign({},h,{Accept:'application/vnd.github.raw+json'}),timeout:60000}); html=r.text||''; } }catch(e){}
-  if(!/APP_BUILD/.test(html)||!/<\/html>/i.test(html)){ if(manual) toast('받은 파일이 게임 파일이 아니에요. 경로를 확인해 주세요.'); return; }
-  const build=(html.match(/var BUILT='([^']+)'/)||[])[1]||'';
-  if(build&&verCmp(build,APP_BUILD)<=0){ o.sha=j.sha; o.build=build; saveLV(o); if(manual) toast('설치된 버전이 이미 최신이에요'); return; }
-  if(build&&o.badBuild===build&&!manual) return;
-  try{ await appStorage.saveLive(html); }
-  catch(e){ toast('업데이트 저장 실패: '+(e.message||'저장 공간을 확인해 주세요')); return; }
-  Object.assign(o,{on:true,sha:j.sha,prevBuild:o.build||'',build,boots:0,failed:false,at:Date.now()}); saveLV(o);
-  openModal(`${head('새 버전을 받았어요')}<p>버전 <b>${esc(build||'알 수 없음')}</b>. 앱을 다시 시작하면 적용돼요.</p><div class="row" style="margin-top:12px"><button class="btn" data-act="reload">지금 다시 시작</button><button class="btn ghost" data-act="close">나중에</button></div>`);
-}
+
 function openUpdSet(){
   const o=LV(), hasPrev=!!o.prevBuild;
   openModal(`${head('앱 업데이트',`<span class="muted">지금 실행 중: ${esc(window.__LIVE__?('온라인 업데이트 '+window.__LIVE__):('설치 버전 '+APP_BUILD))} · 앱 ${esc(window.__SHELL__||APP_BUILD)}</span>`)}
     <p class="muted">앱이 GitHub 공개 저장소에서 새 버전을 받아 와요. 게임 데이터와 키는 그대로 남아요. 받기 전에 바뀐 점을 보여 주고 물어봐요.</p>
+    ${updateCheckHTML(o)}
     <label class="f" for="up_mode">새 버전이 있으면</label><select class="in" id="up_mode">${opt([['ask','물어보고 받기'],['silent','조용히 받아서 다음 실행에 적용'],['off','확인하지 않기']],o.auto===false?'off':(o.mode||'ask'))}</select>
     <details style="margin-top:10px"><summary class="muted">개발자용: 받을 저장소 바꾸기</summary>
       <label class="f" for="up_repo">저장소 (아이디/저장소이름, 비우면 기본 ${RELEASE_REPO})</label><input class="in" id="up_repo" value="${esc(o.repo||'')}" placeholder="${RELEASE_REPO}">
@@ -10658,7 +10740,7 @@ function opEnd(){
   if(!P().seenOpening&&P().nameAsked){ playStory('프롤로그',G.opening.prologue,afterPrologue); return; }
   if(!P().seenOpening){
     openModal(`<h2>${esc(T('player'))}의 이름</h2><p class="muted">${esc(T('crew'))}들은 평소에 「${esc(T('player'))}」(이)라고 부르고, 이름은 필요할 때 불러요. 나중에 설정에서 바꿀 수 있어요.</p><label class="f" for="nm_call">호칭</label><input class="in" id="nm_call" maxlength="12" value="${esc(T('player'))}"><label class="f" for="nm_in">이름</label><input class="in" id="nm_in" maxlength="12" placeholder="비우면 호칭으로만 불려요" value="${esc(P().player)}"><div class="row" style="margin-top:14px"><button class="btn" data-act="setname">임명장에 서명하기</button></div>`,true);
-    setTimeout(()=>$('#nm_in')&&$('#nm_in').focus(),100);
+    setTimeout(()=>$('#nm_in')&&$('#nm_in').focus({preventScroll:true}),100);
   } else playStory('프롤로그',G.opening.prologue,()=>render());
 }
 function afterPrologue(){ setTimeout(()=>{ if(typeof prepAsk==='function') prepAsk(); },4000);
@@ -10969,7 +11051,7 @@ document.addEventListener('click',async e=>{
   case 'swprev': swRead(); SW.step=Math.max(0,SW.step-1); renderSetup(); break;
   case 'swlink': openUrl(t.dataset.url); break;
   case 'swskipall': appStorage.setItem(SETUP_KEY,'1'); if(PJ().active!=='main'){ await flush(); const pj=PJ(); if(!pj.list.some(x=>x.id==='main')) pj.list.unshift({id:'main',title:DEFAULT_META.title}); pj.active='main'; appStorage.setItem(PJKEY,JSON.stringify(pj)); reloadGame(); break; } SW=null; showStart(); break;
-  case 'swgenre': { const k=$('#ng_kw'); if(k){ k.value=t.dataset.v+(k.value.trim()?'. '+k.value.trim():'. '); k.focus(); } break; }
+  case 'swgenre': { const k=$('#ng_kw'); if(k){ k.value=t.dataset.v+(k.value.trim()?'. '+k.value.trim():'. '); k.focus({preventScroll:true}); } break; }
   case 'swgo1': swRead(); SW.step=1; renderSetup(); break;
   case 'swpjgo': case 'swpjnew': { swRead(); swSave(); appStorage.setItem(SETUP_KEY,'1'); const pj=PJ(), pid=id;
       if(a==='swpjnew'){ if(!(await appConfirm('이 게임의 진행(보유 '+T('crew')+'·재화·클리어 기록)을 지우고 처음부터 시작할까요? 만들어 둔 세계관·'+T('crew')+'·스토리·그림은 그대로예요.'))) break;
@@ -11266,7 +11348,7 @@ document.addEventListener('click',async e=>{
   case 'npcadd': { const nm=($('#npc_new').value||'').trim(); if(!nm){ toast('이름을 적어 주세요'); break; } if(npcBy(nm)||findSpeaker(nm)){ toast('이미 있는 이름이에요'); break; } G.npcs=G.npcs||[]; G.npcs.push(npcNew(nm)); mark('meta'); openNpcs(); break; }
   case 'scimg': { const ta=$('#'+t.dataset.ta); if(!ta) break; uploadFor={kind:'scimg',ta:ta.id,pos:ta.selectionStart}; $('#file').click(); break; }
   case 'copy': try{await navigator.clipboard.writeText(t.dataset.text||'');toast('복사했어요');}catch(err){toast('복사하지 못했어요. 길게 눌러 직접 복사해 주세요.');} break;
-  case 'copyfield': { const f=$('#'+t.dataset.f); try{await navigator.clipboard.writeText(f.value);toast('복사했어요');}catch(err){f.select();toast('선택한 텍스트를 직접 복사해 주세요');} break; }
+  case 'copyfield': { const f=$('#'+t.dataset.f); try{await navigator.clipboard.writeText(f.value);toast('복사했어요');}catch(err){uiSelectText(f);toast('선택한 텍스트를 직접 복사해 주세요');} break; }
   case 'charedit': openCharEdit(id); break;
   case 'charnew': openCharEdit(null); break;
   case 'savechar': { if(id){const c=charById(id), old=c.name;if(!readCharForm(c))break; if(old&&old!==c.name&&old.length>=2&&(await appConfirm(`이름이 「${old}」에서 「${c.name}」(으)로 바뀌어요. 스토리·${T('talk')}·다른 캐릭터 대사에 나온 「${old}」도 모두 바꿀까요?`))){ const n=renameEverywhere(old,c.name); toast(`이름을 ${n}곳에서 바꿨어요`); } mark('c:'+id);closeModal();render();openChar(id);}
@@ -11414,7 +11496,7 @@ document.addEventListener('click',async e=>{
       const r=await aiJSON(`${RULES}\n${ctx()}\n\n새 ${T('crew')} 1명을 만들어라. 요청: "${con}"\n메인 플롯이나 세력과 연결되는 비밀을 ${T('files')}에 넣는다.\nJSON 객체만 출력: ${charSchema()}\n희귀도가 높을수록 능력치 합이 높다. 지원형은 heal/shield/buff, 방어형은 체력과 방어가 높다. ${NAI_CHAR}`,t);
       if(r){ const c=cleanChar(r); if(!c.name)c.name='이름 없음'; G.chars.push(c); mark('c:'+c.id); closeModal(); render(); openChar(c.id); artAfterAI(x=>x.o===c||x.c===c,'새 '+T('crew')+' '+c.name); toast(`${c.name}이(가) 추가됐어요`);} break; }
   case 'aichapter-open': openAiChapter(); break;
-  case 'opsch': OPS_CH=t.dataset.ch; render(); window.scrollTo&&window.scrollTo(0,0); break;
+  case 'opsch': OPS_CH=t.dataset.ch; render(); $('#view').scrollTop=0; break;
   case 'opsback': OPS_CH=null; render(); break;
   case 'nextneedai': toast('설정 → 글 AI에서 AI를 먼저 등록해 주세요'); break;
   case 'castt': t.classList.toggle('on'); break;
@@ -11445,7 +11527,7 @@ document.addEventListener('click',async e=>{
   case 'llmpadd': { const L=llmSlots(), keep={top:$('#llm_top').value,mid:$('#llm_mid').value,bot:$('#llm_bot').value,tag:$('#llm_tag')?$('#llm_tag').value:''}, text=$('#llp_text').value.trim(); if(!text){ toast('지침 내용을 적어 주세요'); break; }
       const pid=$('#llp_id').value, nm=$('#llp_name').value.trim()||'지침 '+(L.presets.length+1), pos=$('#llp_pos').value; const x=pid&&L.presets.find(q=>q.id===pid);
       if(x) Object.assign(x,{name:nm,pos,text}); else L.presets.push({id:'lp'+uid(),name:nm,pos,text,on:true}); Object.assign(L,keep); saveLlm(L); openModal(llmHTML()); toast(x?'프리셋을 고쳤어요':'프리셋을 저장했어요(켜짐)'); break; }
-  case 'llmpedit': { const x=llmSlots().presets.find(q=>q.id===id); if(!x) break; $('#llp_name').value=x.name||''; $('#llp_pos').value=x.pos||'top'; $('#llp_text').value=x.text||''; $('#llp_id').value=x.id; $('#llp_text').focus(); break; }
+  case 'llmpedit': { const x=llmSlots().presets.find(q=>q.id===id); if(!x) break; $('#llp_name').value=x.name||''; $('#llp_pos').value=x.pos||'top'; $('#llp_text').value=x.text||''; $('#llp_id').value=x.id; $('#llp_text').focus({preventScroll:true}); break; }
   case 'llmpdel': { const L=llmSlots(), x=L.presets.find(q=>q.id===id); if(!x||!(await appConfirm(`「${x.name}」 프리셋을 지울까요?`))) break; L.presets=L.presets.filter(q=>q!==x); Object.assign(L,{top:$('#llm_top').value,mid:$('#llm_mid').value,bot:$('#llm_bot').value,tag:$('#llm_tag')?$('#llm_tag').value:''}); saveLlm(L); openModal(llmHTML()); break; }
   case 'llmpcopy': { const x=llmSlots().presets.find(q=>q.id===id); if(!x) break; try{ await navigator.clipboard.writeText(llmCode(x)); toast('코드를 복사했어요. 붙여 넣으면 다른 사람이 가져갈 수 있어요'); }catch(e){ if(t.isConnected)openPresetCode('llm',llmCode(x)); } break; }
   case 'llmpimport': openPresetCode('llm'); break;
@@ -11646,7 +11728,7 @@ document.addEventListener('click',async e=>{
       d.mode='detail'; d.reuse={pj:id,title}; try{ if(typeof SW!=='undefined'&&SW&&$('#sw_card,.setup')){ swRead(); swSave(); } }catch(e){} appStorage.setItem(SETUP_KEY,'1'); drLoadFrom(d,title+' 리롤');
       toast(`「${title}」의 캐릭터·NPC·배경 그림을 이름이 같은 인물에 그대로 써요. 세계관·인물 설정을 고친 뒤 만들기를 누르세요`); break; }
   case 'pjdraftx': { let g=null; try{ g=JSON.parse(appStorage.getItem(pjKey(id))||'null'); }catch(e){} const d=g&&g.meta&&g.meta.draft; if(!d){ toast('이 게임에는 저장된 초안이 없어요'); break; } openDraftExport((g.meta.title||'게임')+' 초안',d,null); break; }
-  case 'drxcopy': { const tx=$('#drx_code').value; try{ await navigator.clipboard.writeText(tx); toast('초안 코드를 복사했어요'); }catch(e){ const ta=$('#drx_code'); ta.select(); try{ document.execCommand('copy'); toast('초안 코드를 복사했어요'); }catch(_){ toast('길게 눌러 직접 복사해 주세요'); } } break; }
+  case 'drxcopy': { const tx=$('#drx_code').value; try{ await navigator.clipboard.writeText(tx); toast('초안 코드를 복사했어요'); }catch(e){ const ta=$('#drx_code'); uiSelectText(ta); try{ document.execCommand('copy'); toast('초안 코드를 복사했어요'); }catch(_){ toast('길게 눌러 직접 복사해 주세요'); } } break; }
   case 'drxfile': { if(!DRX) break; await saveTextFile(JSON.stringify({v:1,name:DRX.name,d:drClean(DRX.d)},null,1),'초안_'+String(DRX.name).replace(/[^\w가-힣-]+/g,'_').slice(0,30)+'.json'); break; }
   case 'drxback': { const b=DRX&&DRX.back; DRX=null; if(b) b(); else if($('#dri_code')) openDraft(); else closeModal(); break; }
   case 'drimport': drRead(); openDraftImport(); break;
@@ -11805,7 +11887,7 @@ document.addEventListener('click',async e=>{
       if(back==='prep'&&NPREP&&$('#np_in')) NPREP.draft=Object.fromEntries(['np_in','np_neg','np_seed','np_model','np_size','np_frame','np_pose','np_posesel'].filter(k=>$('#'+k)).map(k=>[k,$('#'+k).value]));
       else if($('#nai_key')){ appStorage.setItem(NKEY,JSON.stringify(readNai())); toast('지금까지 바꾼 그림 AI 설정을 저장했어요'); }
       openStyles(back); break; }
-  case 'styadd': { const x={id:'s'+uid(),name:'새 화풍',tags:'',neg:''}; $('#styList').insertAdjacentHTML('beforeend',styRow(x)); $('#sty_def').insertAdjacentHTML('beforeend',`<option value="${x.id}">새 화풍</option>`); const rows=document.querySelectorAll('#styList .styrow'); const last=rows[rows.length-1]; last.scrollIntoView({block:'center'}); last.querySelector('.sty-n').select(); break; }
+  case 'styadd': { const x={id:'s'+uid(),name:'새 화풍',tags:'',neg:''}; $('#styList').insertAdjacentHTML('beforeend',styRow(x)); $('#sty_def').insertAdjacentHTML('beforeend',`<option value="${x.id}">새 화풍</option>`); const rows=document.querySelectorAll('#styList .styrow'); toast('새 화풍 항목을 목록 아래에 추가했어요'); break; }
   case 'stydel': { const r=t.closest('.styrow'); if(!r) break; if(document.querySelectorAll('#styList .styrow').length<=1){toast('프리셋은 하나 이상 있어야 해요');break;} const o2=$('#sty_def').querySelector(`option[value="${r.dataset.sid}"]`); if(o2) o2.remove(); r.remove(); break; }
   case 'stysave': { const st=readStyles(); let sv={}; try{sv=JSON.parse(appStorage.getItem(NKEY))||{};}catch(err){} sv.styles=st; const d=$('#sty_def').value; sv.styleId=st.some(x=>x.id===d)?d:st[0].id; sv.seeded=['am_v5']; appStorage.setItem(NKEY,JSON.stringify(sv)); toast('화풍 프리셋을 저장했어요');
       if(STYBACK==='prep'&&NPREP){ const dr=NPREP.draft; openNaiPrep(NPREP.kind,NPREP.id); if(dr) Object.entries(dr).forEach(([k,v])=>{ const el=$('#'+k); if(el) el.value=v; }); } else openNaiSet(); break; }
@@ -12257,21 +12339,21 @@ function imageScrollGuard(){
  const NAV={stack:[],cur:null,next:null,restoring:false,closing:false,revision:0};
  const rawOpen=openModal,rawClose=closeModal,project=()=>PJ().active;
  const reset=()=>{NAV.stack=[];NAV.cur=null;NAV.next=null;NAV.closing=false;MBACK=null;};
- function snapshot(entry){const m=$('#modal');if(!entry||m.hidden)return;entry.nodes=[...m.childNodes];entry.scroll=m.querySelector('.sheet')?.scrollTop||0;entry.lock=m.dataset.lock||'';}
+ function snapshot(entry){const m=$('#modal');if(!entry||m.hidden)return;entry.nodes=[...m.childNodes];entry.scroll=m.querySelector('.sheet')?.scrollTop||0;entry.scrollState=uiScrollCapture(m.querySelector('.sheet'));entry.lock=m.dataset.lock||'';}
  function fallbackId(html){const template=document.createElement('template');template.innerHTML=html;if(template.content.querySelector('.naiprev')&&NAIJOB)return 'nairesult:'+NAIJOB.kind+':'+NAIJOB.id;return 'dialog:'+(template.content.querySelector('.sheet-head h2,h2,h3')?.textContent.trim()||template.content.firstElementChild?.className||'dialog');}
  function addBack(){const m=$('#modal'),hd=m.querySelector('.sheet-head');if(hd&&!m.dataset.lock&&(NAV.stack.length||NAV.cur?.mback)&&!hd.querySelector('[data-act="goback"]')){const b=document.createElement('button');b.type='button';b.className='x nav-back';b.dataset.act='goback';b.setAttribute('aria-label','뒤로가기');b.textContent='‹';hd.prepend(b);}}
- openModal=function(html,lock,cls){
-  const next=NAV.next;NAV.next=null;const m=$('#modal');if(NAV.cur&&NAV.cur.project!==project())reset();
+ openModal=function(html,lock,cls,route){
+  const next=route?{id:route}:NAV.next;NAV.next=null;const m=$('#modal');if(NAV.cur&&NAV.cur.project!==project())reset();
   const id=next?.id||fallbackId(html),same=NAV.cur?.id===id;
   if(!same&&NAV.cur?.state&&NAV.cur.id.startsWith('skill:')&&V2EDIT===NAV.cur.state)v2ReadEditor();
   if(!same&&NAV.cur?.state&&NAV.cur.id.startsWith('gear:')&&V2GEAR===NAV.cur.state)v2GearRead();
-  snapshot(NAV.cur);
+  snapshot(NAV.cur);let scrollFrom=same&&!NAV.closing?NAV.cur:null;
   if(!NAV.restoring&&!same){
    const ancestor=NAV.stack.findIndex(e=>e.id===id);
-   if(ancestor>=0)NAV.stack=NAV.stack.slice(0,ancestor);
+   if(ancestor>=0){scrollFrom=NAV.stack[ancestor];NAV.stack=NAV.stack.slice(0,ancestor);}
    else if(NAV.cur&&!NAV.cur.transient&&!NAV.closing&&!m.hidden){NAV.stack.push(NAV.cur);if(NAV.stack.length>32)NAV.stack.shift();}
   }
-  const r=rawOpen.apply(this,arguments);NAV.revision++;NAV.closing=false;
+  const r=rawOpen.apply(this,arguments);if(scrollFrom)uiScrollRestore(m.querySelector('.sheet'),scrollFrom.scrollState);NAV.revision++;NAV.closing=false;
   NAV.cur={...(same?NAV.cur:{}),...(next||{}),id,project:project(),mback:MBACK,transient:!!lock||!!m.querySelector('.spin'),context:next?.getContext?.()};snapshot(NAV.cur);addBack();return r;
  };
  closeModal=function(){const r=rawClose.apply(this,arguments),m=$('#modal');if(!m.hidden)return r;NAV.closing=true;MBACK=null;const revision=++NAV.revision;setTimeout(()=>{if(m.hidden&&revision===NAV.revision)reset();},0);return r;};
@@ -12281,7 +12363,7 @@ function imageScrollGuard(){
    if(entry.id.startsWith('naprep:'))NPREP=entry.context;if(entry.id.startsWith('voice:'))VS=entry.context;if(entry.id.startsWith('skinprop:'))SKPROP=entry.context;
    if(!entry.dom&&entry.reopen)entry.reopen();
    if(!NAV.cur&&entry.nodes){const m=$('#modal');m.replaceChildren(...entry.nodes);m.hidden=false;m.dataset.lock=entry.lock;NAV.cur=entry;NAV.closing=false;NAV.revision++;addBack();}
-   if(!NAV.cur)return false;const sheet=$('#modal .sheet');if(sheet)sheet.scrollTop=entry.scroll||0;return true;
+   if(!NAV.cur)return false;const sheet=$('#modal .sheet');if(sheet){uiScrollRestore(sheet,entry.scrollState);sheet.scrollTop=entry.scroll||0;}return true;
   }finally{NAV.restoring=false;}
  }
  window.navBack=function(){
@@ -12302,10 +12384,10 @@ function imageScrollGuard(){
  };
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&((typeof IMAGE_CANDIDATES!=='undefined'&&IMAGE_CANDIDATES)||!$('#modal').hidden||document.getElementById('v2-standing-help')||document.querySelector('.v2-equipment-bubble'))){window.navBack();event.preventDefault();event.stopImmediatePropagation();}},true);
  // Stable identities distinguish a redraw from opening a child dialog.
- const pages=[['openChar',a=>'char:'+a[0]],['openCharEdit',a=>'charedit:'+a[0]],['openLib',a=>'lib:'+a[0]],['openLibItem',a=>'libitem:'+(a[0]||'new:'+a[1])],['openNaiPrep',a=>'naprep:'+a[0]+':'+a[1]],['openSkinBuy',a=>'skinbuy:'+a[0]],['openFaces',()=> 'faces:'+FACET.cid+':'+FACET.sid],['openSkin',a=>'skin:'+a[0]],['openSkinProp',()=> 'skinprop:'+SKPROP?.cid],['openNpcs',()=>'npcs'],['openRel',a=>'rel:'+(a[0]||RELC)],['openDesign',()=>'design'],['openImgLib',a=>'imglib:'+a[0]],['openNaiSet',()=>'naiset'],['openSound',()=>'sound'],['openWorld',()=>'world'],['openMeta',()=>'meta'],['openProjects',()=>'projects'],['openCx',a=>'cx:'+(a[0]||'')],['openUpConfirm',a=>'upgrade:'+a[0]?.id+':'+a[1]],['openRegen',a=>'regen:'+a[0]],['regenPreview',()=> 'regenpreview:'+REGEN?.cid],['renderVoice',()=> 'voice:'+VS?.cid+':'+VS?.sid],['v2DrawEditor',()=> 'skill:'+V2EDIT?.id],['v2DrawGearEditor',()=> 'gear:'+V2GEAR?.id],['v2OpenTraining',a=>'training:'+a[0]+':'+(a[1]||'rank')],['v2OpenPractice',()=>'practice']];
+ const pages=[['openMail',()=>'mail'],['openGift',a=>'gift:'+a[0]],['openChEdit',()=>'chapter-edit:'+chDraft?.id],['openEpEdit',a=>'episode-edit:'+a[0]+':'+(a[1]||'new')],['openThEdit',a=>'thread-edit:'+a[0]+':'+(a[1]||'new')],['openOpeningEdit',()=>'opening-edit'],['openBannerFrom',a=>'banner-edit:'+a[0]?.id],['openEvEdit',a=>'event-edit:'+(a[0]||'new')],['openDraft',()=>'draft'],['openDispSel',a=>'dispatch:'+a[0]],['openRelEdit',a=>'rel-edit:'+a[0]],['openCxEdit',a=>'codex-edit:'+(a[0]||'new')],['openStoryMemoryEditor',a=>'story-memory:'+a[0]],['openStoryMemory',()=>'story-memory'],['openRgForm',()=>'rogue-formation'],['openChar',a=>'char:'+a[0]],['openCharEdit',a=>'charedit:'+a[0]],['openLib',a=>'lib:'+a[0]],['openLibItem',a=>'libitem:'+(a[0]||'new:'+a[1])],['openNaiPrep',a=>'naprep:'+a[0]+':'+a[1]],['openSkinBuy',a=>'skinbuy:'+a[0]],['openFaces',()=> 'faces:'+FACET.cid+':'+FACET.sid],['openSkin',a=>'skin:'+a[0]],['openSkinProp',()=> 'skinprop:'+SKPROP?.cid],['openNpcs',()=>'npcs'],['openRel',a=>'rel:'+(a[0]||RELC)],['openDesign',()=>'design'],['openImgLib',a=>'imglib:'+a[0]],['openNaiSet',()=>'naiset'],['openSound',()=>'sound'],['openWorld',()=>'world'],['openMeta',()=>'meta'],['openProjects',()=>'projects'],['openCx',a=>'cx:'+(a[0]||'')],['openUpConfirm',a=>'upgrade:'+a[0]?.id+':'+a[1]],['openRegen',a=>'regen:'+a[0]],['regenPreview',()=> 'regenpreview:'+REGEN?.cid],['renderVoice',()=> 'voice:'+VS?.cid+':'+VS?.sid],['v2DrawEditor',()=> 'skill:'+V2EDIT?.id],['v2DrawGearEditor',()=> 'gear:'+V2GEAR?.id],['v2OpenTraining',a=>'training:'+a[0]+':'+(a[1]||'rank')],['v2OpenPractice',()=>'practice']];
  for(const [fn,idf]of pages){const original=window[fn];if(typeof original!=='function')continue;window[fn]=function(...args){
   const previous=NAV.next,state=fn==='v2DrawEditor'?V2EDIT:fn==='v2DrawGearEditor'?V2GEAR:null;
-  const route={id:null,state,dom:['openNaiPrep','openCharEdit','openSkin','openSkinProp','renderVoice'].includes(fn),getContext:()=>fn==='openNaiPrep'?NPREP:fn==='renderVoice'?VS:fn==='openSkinProp'?SKPROP:null,reopen:()=>{if(fn==='v2DrawEditor')V2EDIT=state;if(fn==='v2DrawGearEditor')V2GEAR=state;window[fn](...args);}};
+  const route={id:null,state,dom:['openNaiPrep','openCharEdit','openSkin','openSkinProp','renderVoice','openChEdit','openEpEdit','openThEdit','openOpeningEdit','openBannerFrom','openEvEdit','openDraft','openRelEdit','openCxEdit','openStoryMemoryEditor','openStoryMemory'].includes(fn),getContext:()=>fn==='openNaiPrep'?NPREP:fn==='renderVoice'?VS:fn==='openSkinProp'?SKPROP:null,reopen:()=>{if(fn==='v2DrawEditor')V2EDIT=state;if(fn==='v2DrawGearEditor')V2GEAR=state;window[fn](...args);}};
   // Some openers set their selection before openModal; calculate ID at render time.
   Object.defineProperty(route,'id',{get:()=>idf(args),enumerable:true});NAV.next=route;
   try{return original.apply(this,args);}finally{NAV.next=previous;}
@@ -12325,7 +12407,7 @@ var appStorage=GGMStorage.create(window);
   const modules=[...document.querySelectorAll('script[type="text/ggm-module"]'),document.getElementById('ggm-main')];
   for(const code of modules){if(!code)throw Error('앱 실행 코드가 누락되었습니다.');const script=document.createElement('script');script.id=code.id==='ggm-main'?'ggm-main-running':code.id;script.textContent=code.textContent;code.replaceWith(script);}
  }
- async function boot(){if(window.__LIVE__&&versionCompare(window.__SHELL__,'2026.10.21.6')<0)throw Error('버튼 동작과 업데이트 시작 방식을 고치려면 2026.10.21.6 이상 APK가 필요합니다. 앱을 삭제하지 말고 새 APK를 덮어 설치해 주세요.');if(!window.__STORAGE_SHELL__&&window.__LIVE__)throw Error('이번 버전은 새 APK가 필요합니다. 기존 앱을 삭제하지 말고 공식 APK를 덮어 설치해 주세요.');await appStorage.init();try{if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
+ async function boot(){if(window.__LIVE__&&(versionCompare(window.__SHELL__,window.__REQUIRED_APK__||'2026.10.21.6')<0||!window.__STORAGE_SHELL__)){const error=Error('새 APK 설치가 필요합니다.');error.code='apk_required';error.minimum=window.__REQUIRED_APK__||'2026.10.21.6';throw error;}await appStorage.init();try{if(navigator.storage?.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
  if(!window.__LIVE__&&!/[?&]builtin/.test(location.search)){
   const m=JSON.parse(localStorage.getItem('starfall-live')||'null');
   if(m?.on){const built=window.APP_BUILD,cmp=(a,b)=>{const x=String(a).split(/\D/).map(Number),y=String(b).split(/\D/).map(Number);for(let i=0;i<Math.max(x.length,y.length);i++)if((x[i]||0)!==(y[i]||0))return(x[i]||0)-(y[i]||0);return 0;};
@@ -12336,7 +12418,19 @@ var appStorage=GGMStorage.create(window);
  }
  run();}
  if(!window.indexedDB){run();return;}
- boot().catch(e=>{const box=document.createElement('div');box.id='storage-boot-error';box.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#14161a;color:white;padding:30px;overflow:auto';box.innerHTML='<h2>저장 데이터를 안전하게 열지 못했습니다</h2><p></p><p>데이터를 초기화하지 않았습니다. 다른 메이커 화면을 닫고 기기 저장 공간을 확인한 뒤 다시 실행해 주세요. 앱 삭제·데이터 삭제는 하지 마세요.</p><button type="button">다시 시도</button>';box.querySelector('p').textContent=String(e.message||e);box.querySelector('button').onclick=()=>location.reload();document.body.appendChild(box);});
+ function showFailure(error){
+  const box=document.createElement('div');box.id='storage-boot-error';box.style.cssText='position:fixed;inset:0;z-index:2147483647;background:var(--bg,#14161a);color:var(--text,white);padding:28px 22px;overflow:auto';
+  if(error.code==='apk_required'){
+   box.dataset.reason='apk-required';box.innerHTML='<h2>새 APK 설치가 필요해요</h2><p>이번 업데이트는 앱 안에서 받는 패치만으로 적용할 수 없습니다.</p><div class="panel"><p>현재 설치 APK: <b data-installed></b><br>필요한 APK: <b data-minimum></b> 이상</p></div><p><b>기존 앱을 삭제하지 말고 새 APK를 덮어 설치해 주세요.</b> 데이터를 초기화하지 않았습니다. 같은 공식 앱과 서명으로 덮어 설치하면 기존 게임 데이터를 유지합니다.</p><p>아래 버튼으로 GitHub 릴리즈를 열고, <b>Assets(첨부 파일)</b>에서 <b>gacha-game-maker.apk</b>를 내려받으세요. 다운로드한 APK 파일을 열어 설치합니다. Source code ZIP은 앱 설치 파일이 아닙니다.</p><div class="row"><button class="btn" data-boot-release>GitHub 릴리즈 열기</button><button class="btn ghost" data-boot-builtin>설치된 버전으로 돌아가기</button></div><p data-boot-hint role="status"></p>';
+   box.querySelector('[data-installed]').textContent=window.__SHELL__||'확인 필요';box.querySelector('[data-minimum]').textContent=error.minimum;
+   box.querySelector('[data-boot-release]').onclick=async()=>{const url='https://github.com/jjhk0803/gacha-game-maker/releases/latest';try{const browser=window.Capacitor?.Plugins?.Browser;if(browser){await browser.open({url});return;}}catch(e){}try{const opened=window.open(url,'_blank');if(opened)return;}catch(e){}const hint=box.querySelector('[data-boot-hint]');hint.textContent='브라우저에서 아래 주소를 열어 주세요: ';const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';link.textContent=url;hint.append(link);};
+   box.querySelector('[data-boot-builtin]').onclick=()=>{location.href=location.pathname+'?builtin=1';};
+  }else{
+   box.innerHTML='<h2>저장 데이터를 안전하게 열지 못했습니다</h2><p></p><p>데이터를 초기화하지 않았습니다. 다른 메이커 화면을 닫고 기기 저장 공간을 확인한 뒤 다시 실행해 주세요. 앱 삭제·데이터 삭제는 하지 마세요.</p><button class="btn">다시 시도</button>';box.querySelector('p').textContent=String(error.message||error);box.querySelector('button').onclick=()=>location.reload();
+  }
+  document.body.appendChild(box);
+ }
+ boot().catch(showFailure);
 })();
 
 </script>
