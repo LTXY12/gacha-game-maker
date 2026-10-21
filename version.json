@@ -1,15 +1,15 @@
 {
-  "build": "2026.10.21.5",
+  "build": "2026.10.21.6",
   "notes": [
-    "스토리 요약 및 스토리 생성 참조 컨텍스트 크기 증가"
+    "스킬 관련 버튼이 안 눌리는 치명적인 버그 수정"
   ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "9af5e6f19d3e431ff21be5b51c003841853a32e4692eb8524d41bb2e8047836f",
+  "sha256": "557b16019454e1e429f53759976bb6dfee21a8f8a05bd0e3611a06c68700292f",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest/download/gacha-game-maker.apk",
-    "build": "2026.10.21.5"
+    "build": "2026.10.21.6"
   },
   "feedback": "",
-  "at": "2026-10-21T06:11:16.308064Z"
+  "at": "2026-10-21T09:02:12.121141Z"
 }
