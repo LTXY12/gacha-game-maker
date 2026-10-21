@@ -10,7 +10,7 @@ const ALLOW_HOSTS = [
 function cors(req) {
   return {
     'access-control-allow-origin': ALLOW_ORIGIN,
-    'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'access-control-allow-methods': 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS',
     'access-control-allow-headers': req.headers.get('access-control-request-headers') || '*',
     'access-control-expose-headers': '*',
     'access-control-max-age': '86400',

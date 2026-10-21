@@ -1,16 +1,16 @@
 {
-  "build": "2026.10.22.1",
+  "build": "2026.10.22.2",
   "notes": [
-    "깃허브 422 에러 수정"
+    "각종 버그 픽스"
   ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "59c1e066ba3be7195643a2e3ad8d9421877a33ec5640d0a394cab92e80b3e451",
+  "sha256": "09f441dd2b1247d593439e85a3a2a472518a99776e1cb37c4ab5e5671db435cb",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest",
-    "build": "2026.10.22.1",
+    "build": "2026.10.22.2",
     "minShell": "2026.10.21.6"
   },
   "feedback": "",
-  "at": "2026-10-21T16:54:45.061661Z"
+  "at": "2026-10-21T23:05:51.508074Z"
 }

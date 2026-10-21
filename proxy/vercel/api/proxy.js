@@ -10,7 +10,7 @@ const ALLOW_HOSTS = [
 function cors(req) {
   return {
     'access-control-allow-origin': ALLOW_ORIGIN,
-    'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'access-control-allow-methods': 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS',
     'access-control-allow-headers': req.headers.get('access-control-request-headers') || '*',
     'access-control-expose-headers': '*',
     'access-control-max-age': '86400',
@@ -35,4 +35,4 @@ async function handle(req) {
   Object.entries(cors(req)).forEach(([k, v]) => out.set(k, v));
   return new Response(r.body, { status: r.status, statusText: r.statusText, headers: out });
 }
-export const GET = handle, POST = handle, PUT = handle, DELETE = handle, OPTIONS = handle;
+export const GET = handle, HEAD = handle, POST = handle, PUT = handle, PATCH = handle, DELETE = handle, OPTIONS = handle;
