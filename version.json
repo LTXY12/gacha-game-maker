@@ -1,15 +1,15 @@
 {
-  "build": "2026.10.20.22",
+  "build": "2026.10.21.3",
   "notes": [
-    "전투, 연출, 성장, 이미지 생성, 스킬, 연습장, 조작개선, 운영개선"
+    "bug fix"
   ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "57596be7bba80af78d8087f7f3655635a581719f9cf0fc292c3b467424494d36",
+  "sha256": "a1792e1616f1ee4ad763dfd18f321073352f83bbc022ffc7c0992e97e7bca707",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest/download/gacha-game-maker.apk",
     "build": "2026.10.20.22"
   },
   "feedback": "",
-  "at": "2026-10-20T15:40:43.353356Z"
+  "at": "2026-10-21T00:56:39.521412Z"
 }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <script>
 (function(){
-  var BUILT='2026.10.20.22'; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
+  var BUILT='2026.10.21.3'; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
   function vc(a,b){a=String(a||'').split(/\D+/).map(Number);b=String(b||'').split(/\D+/).map(Number);for(var i=0;i<Math.max(a.length,b.length);i++){var x=a[i]||0,y=b[i]||0;if(x!==y)return x<y?-1:1;}return 0;}
   if(window.__LIVE__) return;
   try{
@@ -1932,6 +1932,15 @@ img,video,canvas{max-width:100%}
 .fc-grid{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
 .t-snd{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;z-index:5;width:44px;height:44px;border-radius:50%;border:1px solid #fff5;background:#0008;color:#fff;font-size:1.25rem;display:grid;place-items:center;cursor:pointer}
 .mrow .mdel{flex:none;padding:4px 9px;opacity:.7}
+
+/* Long preset codes stay inside the editor, including above mobile keyboards. */
+#modal>.sheet.preset-code-sheet{display:flex;flex-direction:column;gap:8px;min-height:0;max-height:100%;overflow:hidden;overscroll-behavior:contain;padding:12px 14px max(12px,env(safe-area-inset-bottom,0px));animation:none}
+.preset-code-sheet>.sheet-head,.preset-code-help,.preset-code-label,.preset-code-actions{flex-shrink:0}
+.preset-code-body{flex:1 1 0%;min-height:0;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto;overscroll-behavior:contain}
+.preset-code-help{margin:0;font-size:.8rem;line-height:1.4}.preset-code-label{font-size:.85rem}
+#preset-code-input{flex:1 1 0%;height:0;min-height:64px;min-width:0;width:100%;resize:none;overflow:auto;overscroll-behavior:contain;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all;font-size:16px;line-height:1.4}
+#preset-code-error{flex-shrink:0;max-height:48px;overflow:auto;margin:0;color:var(--rose);font-size:.8rem;overflow-wrap:anywhere}
+.preset-code-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-top:4px}.preset-code-actions>.btn{min-height:44px;min-width:0;white-space:nowrap}.preset-code-actions>.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--sub)}
 </style>
 </head>
 <body>
@@ -2387,7 +2396,9 @@ function aiDesign(c,slot,raw={}){
  if(!recipe)throw new Error('이 역할·세대에서 지원하지 않는 설계: '+text(raw.recipe,60));
  const g=generation(c),power=clamp(raw.power,70,130,100)/100*[1,1.2,1.45,1.75,2.1][g-1],boost=slot==='ultimate'?1.65:1;
  let hash=0;for(const ch of String(c.name||'')+String(raw.name||recipe.label))hash=(hash*31+ch.charCodeAt(0))>>>0;
- const make=(type,target,value)=>type==='sp'?effect('sp',target,value):defaultEffect(type,{target,value,duration:slot==='passive'?8:6,interval:2,hits:3,stacks:1,condition:'always',priority:Studio.PRIORITY[1]});
+ // atk_up/def_up/crit_up and similar engine effects have no studio descriptor.
+ // Keep their engine format rather than assigning a studio flag to them.
+ const make=(type,target,value)=>type==='sp'?effect('sp',target,value):defaultEffect(type,{studio:has(Studio.EFFECTS,type),target,value,duration:slot==='passive'?8:6,interval:2,hits:3,stacks:1,condition:'always',priority:Studio.PRIORITY[1]});
  const main=make(recipe.type,recipe.target,recipe.value*power*boost),effects=[main];
  // Restrict support coverage rather than allowing a low-tier healer to solve
  // every defensive/offensive/resource problem in the same skill.
@@ -3497,7 +3508,7 @@ function v2ConditionSettings(e){
  return `${numeric[e.condition]?v2Number('threshold',e.threshold,1,100,numeric[e.condition],1):''}${named?`<label class="f">${e.condition==='self_mode'?'자신에게 필요한 모드 이름':'확인할 표식 이름'}<input class="in" maxlength="80" data-v2-field="conditionMark" value="${esc(e.conditionMark)}"></label>`:''}`;
 }
 function v2LegacyEffectText(e){const spec=GGMCombat.effectSpec(e),n=x=>Math.round(x*100)/100,mult=spec[1].includes('배율'),unit=mult?'%':spec[1],timed=['atk_up','def_up','spd_up','crit_up','atk_down','def_down','spd_down','vulnerable','reduction','shield','dot','regen'].includes(e.type);return `${GGMCombat.TARGETS[e.target]} ${spec[0]} ${n(e.value*(mult?100:1))}${unit}${timed?' · '+n(e.duration)+'초':''}`;}
-function v2SkillText(s,slot){const time=n=>Math.round(n*100)/100;return (slot==='ultimate'?('개인 SP 100 충전 시 · '+(s.effects.some(e=>e.type==='invincible')?'최소 재사용 '+time(s.lockout)+'초 · ':'')):GGMCombat.TRIGGERS[s.trigger]+(s.trigger==='interval'?' '+time(Math.max(s.triggerEvery,s.cooldown))+'초마다':['after_basic','on_hit','attack_hit','critical'].includes(s.trigger)?' '+Math.round(s.triggerEvery)+'회마다':'')+' · 첫 대기 '+time(s.initial)+'초 / 안전 대기 '+time(s.cooldown)+'초 · ')+s.effects.map(e=>e.studio?GGMStudio.describe({...e,value:time(e.value),chance:time(e.chance),duration:time(e.duration),turns:time(e.turns),target:GGMCombat.TARGETS[e.target],condition:GGMCombat.CONDITIONS[e.condition]}).replace(/\s*대상 소멸 시.*$/,'').replace(/\s*\((?:지속시간 갱신|강한 효과만 유지|독립적으로 적용), (?:해제 가능|해제 불가)\)/g,'').replace(/\s*\[(?:시전자별로 구분|아군끼리 공유)\]/g,''):v2LegacyEffectText(e)).join(' / ');}
+function v2SkillText(s,slot){const time=n=>Math.round(n*100)/100;return (slot==='ultimate'?('개인 SP 100 충전 시 · '+(s.effects.some(e=>e.type==='invincible')?'최소 재사용 '+time(s.lockout)+'초 · ':'')):GGMCombat.TRIGGERS[s.trigger]+(s.trigger==='interval'?' '+time(Math.max(s.triggerEvery,s.cooldown))+'초마다':['after_basic','on_hit','attack_hit','critical'].includes(s.trigger)?' '+Math.round(s.triggerEvery)+'회마다':'')+' · 첫 대기 '+time(s.initial)+'초 / 안전 대기 '+time(s.cooldown)+'초 · ')+s.effects.map(e=>e.studio&&GGMStudio.EFFECTS[e.type]?GGMStudio.describe({...e,value:time(e.value),chance:time(e.chance),duration:time(e.duration),turns:time(e.turns),target:GGMCombat.TARGETS[e.target],condition:GGMCombat.CONDITIONS[e.condition]}).replace(/\s*대상 소멸 시.*$/,'').replace(/\s*\((?:지속시간 갱신|강한 효과만 유지|독립적으로 적용), (?:해제 가능|해제 불가)\)/g,'').replace(/\s*\[(?:시전자별로 구분|아군끼리 공유)\]/g,''):v2LegacyEffectText(e)).join(' / ');}
 function v2VisualSelect(value){return `<select class="in" data-v2-field="fx">${Object.entries(GGMVisuals.groups).map(([label,names])=>`<optgroup label="${label}">${names.map(name=>`<option value="${name}" ${name===value?'selected':''}>${name}</option>`).join('')}</optgroup>`).join('')}${!GGMVisuals.PRESET_NAMES.includes(value)?`<optgroup label="기존 저장 설정"><option selected value="${esc(value)}">${esc(value)} (기존)</option></optgroup>`:''}</select>`;}
 function v2ArraySelect(name,values,value){return v2Select(name,Object.fromEntries(values.map(v=>[v,v])),value);}
 function v2EffectTypeSelect(type){
@@ -3508,7 +3519,7 @@ function v2EffectTypeSelect(type){
 }
 function v2EffectSettings(e){
  const C=GGMCombat,S=GGMStudio,fields=S.EFFECTS[e.type]?.fields||[];
- if(!e.studio){const spec=C.effectSpec(e),scale=spec[1].includes('배율')?100:1;return `<div class="g2">${v2Number('value',e.value,spec[2]*scale,spec[3]*scale,(scale===100?'효과량 (공격력 대비 %)':spec[1])+(C.endpointGrowthKind(e)?' · Lv.10 기준':''),['cleanse','dispel'].includes(e.type)?1:'.01',scale)}${v2TimedEffect(e)&&!['stun','silence','taunt'].includes(e.type)?v2Number('duration',e.duration,.1,180,'지속 시간 (초)'):''}</div>`;}
+ if(!e.studio||!S.EFFECTS[e.type]){const spec=C.effectSpec(e),scale=spec[1].includes('배율')?100:1;return `<div class="g2">${v2Number('value',e.value,spec[2]*scale,spec[3]*scale,(scale===100?'효과량 (공격력 대비 %)':spec[1])+(C.endpointGrowthKind(e)?' · Lv.10 기준':''),['cleanse','dispel'].includes(e.type)?1:'.01',scale)}${v2TimedEffect(e)&&!['stun','silence','taunt'].includes(e.type)?v2Number('duration',e.duration,.1,180,'지속 시간 (초)'):''}</div>`;}
  const ranges={value:[0,C.effectSpec(e)[3],e.basis==='고정 수치'||e.type==='fixed'?'고정 수치':'기준 수치 대비 / 효과량 (%)'],hits:[1,30,'횟수 / 타수'],decay:[0,100,'연쇄마다 피해 감소 (%)'],interval:[.1,180,'발생 간격 (초)'],duration:[.1,180,'지속 시간 (초)'],delay:[.1,180,'발동 지연 (초)'],stacks:[1,99,'적용 / 소모 중첩'],maxStacks:[1,99,'최대 중첩'],penetration:[0,100,'방어력 무시 (%)'],cap:[1,1000000,'기록 / 전환 최대 수치'],hpRemain:[1,1000000,'생존 시 남는 HP'],count:[1,10,'제거할 효과 개수'],turns:[.1,60,'대기 변화량 (초)']};
  const selects={basis:['수치 계산 기준',S.BASIS],stat:['변경할 능력치',S.STATS],status:['상태 종류',e.type==='stun'?['기절','빙결','마비','속박']:['독','화상','감전','기절','빙결','마비','속박','혼란','전체 상태이상']],element:['변경할 속성',[...ELEMS]],freeze:['행동 게이지 처리',['행동만 정지','게이지 충전도 정지']],skillSlot:['적용할 스킬',['액티브','필살기','액티브와 필살기']],recordSource:['기록할 수치',['실제로 받은 HP 피해','실제로 준 HP 피해','실제 회복량','보호막이 막은 피해','일반 공격 횟수','필살기 사용 횟수']]};
  return `<div class="g2">${fields.map(key=>{
@@ -4584,6 +4595,43 @@ function saveLlm(L){ try{ localStorage.setItem(LLMKEY,JSON.stringify(L)); return
 function llmEff(L){ L=L||llmSlots(); const o={top:L.top||'',mid:L.mid||'',bot:L.bot||'',tag:L.tag||''}; L.presets.filter(x=>x&&x.on&&String(x.text||'').trim()).forEach(x=>{ const k=['top','mid','bot','tag'].includes(x.pos)?x.pos:'top'; o[k]=(o[k]?o[k].trim()+'\n':'')+String(x.text).trim(); }); return o; }
 const llmCode=p=>'GGMLLM:'+btoa(unescape(encodeURIComponent(JSON.stringify({name:p.name,pos:p.pos,text:p.text}))));
 function llmFromCode(t){ const m=String(t||'').trim().match(/GGMLLM:([A-Za-z0-9+/=]+)/); if(!m) return null; try{ const o=JSON.parse(decodeURIComponent(escape(atob(m[1])))); return o&&o.text?o:null; }catch(e){ return null; } }
+// Native Android prompt can expand past the keyboard when a long code is pasted.
+// Keep long text in its field and the action footer outside the scrolling body.
+function openPresetCode(kind,code){
+ const exporting=typeof code==='string',llm=kind==='llm',title=(llm?'지침':'그림체')+' 프리셋 '+(exporting?'코드 내보내기':'코드 가져오기'),parent=$('#modal .sheet');
+ const draft=[...(parent?.querySelectorAll('input[id],textarea[id],select[id]')||[])].map(el=>({id:el.id,value:el.value,checked:el.checked})),scroll=parent?.scrollTop||0,project=PJ().active;
+ openModal(`${head(title)}<div class="preset-code-body"><p class="muted preset-code-help">${exporting?'코드를 길게 눌러 복사하거나 전체 선택을 눌러 주세요.':(llm?'GGMLLM:':'GGMPACK:')+'로 시작하는 코드 전체를 붙여 넣어 주세요.'}</p><label class="preset-code-label" for="preset-code-input">프리셋 코드</label><textarea class="in" id="preset-code-input" wrap="soft" spellcheck="false" autocapitalize="off" autocomplete="off" ${exporting?'readonly':''}></textarea><p id="preset-code-error" role="alert" hidden></p></div><div class="preset-code-actions"><button type="button" class="btn ghost" data-preset-code-action="cancel">${exporting?'닫기':'취소'}</button><button type="button" class="btn" data-preset-code-action="accept" ${exporting?'':'disabled'}>${exporting?'전체 선택':'가져오기'}</button></div>`,false,'preset-code-sheet');
+ const modal=$('#modal'),sheet=modal.querySelector('.preset-code-sheet'),input=sheet.querySelector('textarea'),accept=sheet.querySelector('[data-preset-code-action=accept]'),error=sheet.querySelector('[role=alert]'),previousStyle=modal.style.cssText,vv=window.visualViewport;
+ input.value=exporting?code:'';
+ const current=()=>sheet.isConnected&&!modal.hidden&&PJ().active===project;
+ const showError=text=>{error.textContent=text;error.hidden=false;};
+ const fit=()=>{if(!current())return;const height=Math.max(0,Number(vv?.height)||innerHeight);modal.style.top=(vv?.offsetTop||0)+'px';modal.style.height=height+'px';modal.style.bottom='auto';sheet.style.height=Math.min(620,Math.max(0,height-16))+'px';};
+ function cleanup(){vv?.removeEventListener('resize',fit);vv?.removeEventListener('scroll',fit);removeEventListener('resize',fit);observer.disconnect();modal.style.cssText=previousStyle;}
+ const observer=new MutationObserver(()=>{if(!sheet.isConnected||modal.hidden)cleanup();});observer.observe(modal,{childList:true,attributes:true,attributeFilter:['hidden'],subtree:true});
+ vv?.addEventListener('resize',fit);vv?.addEventListener('scroll',fit);addEventListener('resize',fit);fit();
+ input.addEventListener('input',()=>{accept.disabled=!input.value.trim();error.hidden=true;});
+ let committed=false;
+ sheet.addEventListener('click',event=>{
+  const button=event.target.closest('[data-preset-code-action]');if(!button)return;event.stopPropagation();if(!current()||committed)return;
+  if(button.dataset.presetCodeAction==='cancel'){window.navBack();return;}
+  if(exporting){input.focus({preventScroll:true});input.select();return;}
+  if(!input.value.trim())return;
+  if(llm){
+   const item=llmFromCode(input.value);if(!item){showError('코드를 읽지 못했어요. GGMLLM:으로 시작하는 코드 전체를 확인해 주세요.');return;}
+   const L=llmSlots();L.presets.push({id:'lp'+uid(),name:String(item.name||'가져온 지침').slice(0,30),pos:['top','mid','bot','tag'].includes(item.pos)?item.pos:'top',text:String(item.text),on:false});
+   for(const key of ['top','mid','bot','tag']){const field=draft.find(x=>x.id==='llm_'+key);if(field)L[key]=field.value;}
+   if(!saveLlm(L)){showError('저장 공간이 부족해요. 입력한 코드는 유지했어요.');return;}
+  }else{
+   const item=packFromCode(input.value);if(!item){showError('코드를 읽지 못했어요. GGMPACK:으로 시작하는 코드 전체를 확인해 주세요.');return;}
+   item.id='u'+uid();delete item.llm;item.name=String(item.name||'받은 프리셋').slice(0,30);const items=userPacks();items.unshift(item);
+   if(!saveUserPacks(items)){showError('저장 공간이 부족해요. 입력한 코드는 유지했어요.');return;}
+  }
+  committed=true;cleanup();window.navBack();openModal(llm?llmHTML():packHTML());
+  const restored=$('#modal .sheet');for(const value of draft){const el=restored.querySelector('#'+value.id);if(el){el.value=value.value;if(el.type==='checkbox'||el.type==='radio')el.checked=value.checked;}}restored.scrollTop=scroll;
+  toast(llm?'가져왔어요. 내용을 확인하고 켜 주세요':'그림체 프리셋을 추가했어요. 적용을 눌러 쓰세요');
+ });
+ if(!exporting)input.focus({preventScroll:true});
+}
 // 모든 글 AI 요청에 지침을 끼워요: 상단=맨 앞, 중단=출력 형식(JSON만 출력…) 바로 앞, 하단=맨 끝
 // 그림 태그 지침: AI가 NovelAI(그림) 태그를 쓰는 요청에만 출력 형식 바로 앞에 넣어요
 const TAG_REQ=/NovelAI|naiPrompt|Danbooru|영어 태그|장면 태그/;
@@ -6277,6 +6325,13 @@ function spoilFree(c,arr){ arr=arr||[]; if(!arr.length) return arr; const seen=s
   const unseen=[...G.chars,...(G.npcs||[])].map(x=>x.name).filter(n=>n&&n.length>=2&&n!==self&&!seen.includes(n)); if(!unseen.length) return arr;
   return arr.filter(l=>!unseen.some(n=>String(l).includes(n))); }
 function affLinePool(c){ return spoilFree(c,affLinePool0(c)); }
+function pickTouchLine(pool,current=''){
+  const lines=(Array.isArray(pool)?pool:[]).filter(l=>typeof l==='string'&&sub(l).trim());
+  const different=lines.filter(l=>sub(l)!==String(current??''));
+  // All generated/skin lines can resolve to the same text. Never retry until
+  // different: use a bounded selection, keeping original lines for speech.
+  return rand(different.length?different:lines)||'…';
+}
 function affLinePool0(c){const o=own(c.id),lv=affLv(o),k=skinOf(c);let pool=k&&(k.lines||[]).length?[...k.lines,...k.lines,...c.lines]:[...c.lines];Object.entries(c.affLines||{}).forEach(([k,v])=>{if(lv>=+k)pool.push(...(v||[]));});return pool;}
 function affLv(o){return Math.min(10,Math.floor((o?.aff||0)/GGMCombat.AFFINITY.step)+1);}
 const AFF_MAX=GGMCombat.AFFINITY.max; function affFull(o){return !!o&&(o.aff||0)>=AFF_MAX;}
@@ -11018,11 +11073,11 @@ document.addEventListener('click',async e=>{
   case 'lbshow': document.body.classList.remove('lb-hidden'); break;
   case 'poke': { if(document.body.classList.contains('lb-hidden')){ document.body.classList.remove('lb-hidden'); break; } const c=charById(p.sec); if(!c||!own(c.id)) break;
       const r=t.getBoundingClientRect(), fy=e.clientY?(e.clientY-r.top)/r.height:0.2, zone=fy<0.3?'head':fy<0.72?'body':'base';
-      let pool=spoilFree(c,zone==='head'?c.touch.head:zone==='body'?c.touch.body:affLinePool(c)); if(!pool.length) pool=affLinePool(c);
+      let pool=spoilFree(c,zone==='head'?c.touch?.head:zone==='body'?c.touch?.body:affLinePool(c)); if(!pool.length) pool=affLinePool(c);
       const face=touchFace(c,zone,affLv(own(c.id)));
       addAff(c,zone==='body'?1:2); bump('touch'); mark('prog');
-      const b=$('#bubble'); let l=rand(pool)||'…'; if(pool.length>1) while(sub(l)===b.textContent) l=rand(pool);
-      b.textContent=sub(l); if(c.voiceId&&SND().voiceLobby) speak(c,l); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+      const b=$('#bubble'), l=pickTouchLine(pool,b?.textContent);
+      if(b){ b.textContent=sub(l); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); } if(c.voiceId&&SND().voiceLobby) speak(c,l);
       const st=t.querySelector('.lb-stage')||t; const old=st.querySelector('.lobby-art:not(.lobby-pose)'); if(old){ /* 레이어 그림(포즈)은 표정 그림이 없어서 그대로 둬요. 바꾸면 스탠딩으로 고정돼 버렸어요 */ const tmp=document.createElement('div'); tmp.innerHTML=P().lobbyMode==='stand'?art(c,'lobby-art react',{face}):lobbyCharacterArt(c,'lobby-art react',face); old.replaceWith(tmp.firstElementChild); clearTimeout(window._faceT); window._faceT=setTimeout(()=>{const cur=document.querySelector('.lobby-art'); if(cur&&tab==='lobby'){const t2=document.createElement('div');t2.innerHTML=P().lobbyMode==='stand'?art(c,'lobby-art'):lobbyCharacterArt(c);cur.replaceWith(t2.firstElementChild);}},3500); }
       { const x=e.clientX||innerWidth/2, y=e.clientY||innerHeight/2, lv=affLv(own(c.id)); ripple(x,y,lv>=7); if(lv>=5&&zone!=='body') hearts(x,y,Math.min(5,lv-3)); setTimeout(()=>charReact(document.querySelector('.lobby .lobby-art,.lobby .lobby-ill'),lv,zone),10); } break; }
   case 'phone': e.stopPropagation(); openPhone(); break;
@@ -11067,11 +11122,11 @@ document.addEventListener('click',async e=>{
   case 'char': openChar(id); break;
   case 'evspoke': { const c=charById(id); if(!c) break; const o=own(c.id), lv=o?affLv(o):1, r=t.getBoundingClientRect(), y=e.clientY||r.top+r.height/2, zone=(y-r.top)/r.height<0.3?'head':'body';
       ripple(e.clientX||r.left+r.width/2,y,lv>=7); charReact(t.querySelector('.art'),lv,zone); faceSwap(c,t.querySelector('.art'),touchFace(c,zone,lv));
-      let pool=spoilFree(c,(zone==='head'?c.touch.head:c.touch.body)||[]); if(!pool.length) pool=affLinePool(c); let l=rand(pool)||'…'; if(pool.length>1) while(sub(l)===sub(EVS_LINE)) l=rand(pool); EVS_LINE=l;
+      let pool=spoilFree(c,(zone==='head'?c.touch?.head:c.touch?.body)||[]); if(!pool.length) pool=affLinePool(c); const l=pickTouchLine(pool,sub(EVS_LINE)); EVS_LINE=l;
       const pe=$('#evsLine'); if(pe){ pe.textContent=sub(l); pe.classList.remove('pop'); void pe.offsetWidth; pe.classList.add('pop'); } if(voiceOf(c)&&SND().voiceLobby) speak(c,l); break; }
   case 'cspoke': { const c=charById(id); if(!c) break; const o=own(c.id), lv=o?affLv(o):1, x=e.clientX||innerWidth/2, y=e.clientY||innerHeight/2, r=t.getBoundingClientRect(), zone=(y-r.top)/r.height<0.3?'head':'body';
       ripple(x,y,lv>=7); if(o&&lv>=5&&zone==='head') hearts(x,y,Math.min(5,lv-3)); charReact(t.querySelector('.art'),lv,zone); faceSwap(c,t.querySelector('.art'),touchFace(c,zone,lv));
-      const pool=spoilFree(c,o?(zone==='head'&&c.touch.head.length?c.touch.head:zone==='body'&&c.touch.body.length?c.touch.body:affLinePool(c)):c.lines); const l=rand(pool); const sy=$('#csSay');
+      const pool=spoilFree(c,o?(zone==='head'&&c.touch?.head?.length?c.touch.head:zone==='body'&&c.touch?.body?.length?c.touch.body:affLinePool(c)):c.lines); const sy=$('#csSay'), l=pickTouchLine(pool,sy?.textContent);
       if(l&&sy){ sy.textContent=sub(l); sy.hidden=false; sy.classList.remove('pop'); void sy.offsetWidth; sy.classList.add('pop'); clearTimeout(window._csT); window._csT=setTimeout(()=>{if(sy.isConnected)sy.hidden=true;},3200); if(c.voiceId&&SND().voiceLobby) speak(c,l); }
       if(o){ addAff(c,1); mark('prog'); } break; }
   case 'cstab': { CS_TAB=t.dataset.k; document.querySelectorAll('.cs-tabs button').forEach(b=>b.classList.toggle('on',b.dataset.k===CS_TAB)); document.querySelectorAll('[data-cs]').forEach(s=>s.hidden=s.dataset.cs!==CS_TAB); break; }
@@ -11339,12 +11394,12 @@ document.addEventListener('click',async e=>{
       if(x) Object.assign(x,{name:nm,pos,text}); else L.presets.push({id:'lp'+uid(),name:nm,pos,text,on:true}); Object.assign(L,keep); saveLlm(L); openModal(llmHTML()); toast(x?'프리셋을 고쳤어요':'프리셋을 저장했어요(켜짐)'); break; }
   case 'llmpedit': { const x=llmSlots().presets.find(q=>q.id===id); if(!x) break; $('#llp_name').value=x.name||''; $('#llp_pos').value=x.pos||'top'; $('#llp_text').value=x.text||''; $('#llp_id').value=x.id; $('#llp_text').focus(); break; }
   case 'llmpdel': { const L=llmSlots(), x=L.presets.find(q=>q.id===id); if(!x||!(await appConfirm(`「${x.name}」 프리셋을 지울까요?`))) break; L.presets=L.presets.filter(q=>q!==x); Object.assign(L,{top:$('#llm_top').value,mid:$('#llm_mid').value,bot:$('#llm_bot').value,tag:$('#llm_tag')?$('#llm_tag').value:''}); saveLlm(L); openModal(llmHTML()); break; }
-  case 'llmpcopy': { const x=llmSlots().presets.find(q=>q.id===id); if(!x) break; try{ await navigator.clipboard.writeText(llmCode(x)); toast('코드를 복사했어요. 붙여 넣으면 다른 사람이 가져갈 수 있어요'); }catch(e){ prompt('이 코드를 복사해 주세요',llmCode(x)); } break; }
-  case 'llmpimport': { const c=prompt('GGMLLM: 으로 시작하는 코드를 붙여 넣어 주세요',''); if(!c) break; const o=llmFromCode(c); if(!o){ toast('코드를 읽지 못했어요'); break; } const L=llmSlots(); L.presets.push({id:'lp'+uid(),name:String(o.name||'가져온 지침').slice(0,30),pos:['top','mid','bot'].includes(o.pos)?o.pos:'top',text:String(o.text),on:false}); Object.assign(L,{top:$('#llm_top').value,mid:$('#llm_mid').value,bot:$('#llm_bot').value,tag:$('#llm_tag')?$('#llm_tag').value:''}); saveLlm(L); openModal(llmHTML()); toast('가져왔어요. 내용을 확인하고 켜 주세요'); break; }
+  case 'llmpcopy': { const x=llmSlots().presets.find(q=>q.id===id); if(!x) break; try{ await navigator.clipboard.writeText(llmCode(x)); toast('코드를 복사했어요. 붙여 넣으면 다른 사람이 가져갈 수 있어요'); }catch(e){ if(t.isConnected)openPresetCode('llm',llmCode(x)); } break; }
+  case 'llmpimport': openPresetCode('llm'); break;
   case 'packuse': { const p=allPresets().concat(userPacks()).find(x=>x.id===t.dataset.v); if(!p) break; packApply(p); toast(`「${p.name}」 그림체를 적용했어요`); openModal(packHTML()); break; }
   case 'packdel': { const a=userPacks(), p=a.find(x=>x.id===t.dataset.v); if(!p||!(await appConfirm(`「${p.name}」 프리셋을 지울까요?`))) break; saveUserPacks(a.filter(x=>x!==p)); openModal(packHTML()); break; }
-  case 'packcopy': { const p=userPacks().find(x=>x.id===t.dataset.v); if(!p) break; const code=packCode(Object.assign({},p,{id:undefined})); try{ await navigator.clipboard.writeText(code); toast('프리셋 코드를 복사했어요. 붙여 넣어 공유하세요'); }catch(e){ prompt('이 코드를 복사해 공유하세요',code); } break; }
-  case 'packimport': { const t2=prompt('받은 프리셋 코드(GGMPACK:…)를 붙여 넣으세요'); if(!t2) break; const p=packFromCode(t2); if(!p){ toast('프리셋 코드를 읽지 못했어요'); break; } p.id='u'+uid(); delete p.llm; p.name=String(p.name||'받은 프리셋').slice(0,30); const a=userPacks(); a.unshift(p); if(saveUserPacks(a)) toast(`「${p.name}」 프리셋을 추가했어요. 적용을 눌러 쓰세요`); openModal(packHTML()); break; }
+  case 'packcopy': { const p=userPacks().find(x=>x.id===t.dataset.v); if(!p) break; const code=packCode(Object.assign({},p,{id:undefined})); try{ await navigator.clipboard.writeText(code); toast('프리셋 코드를 복사했어요. 붙여 넣어 공유하세요'); }catch(e){ if(t.isConnected)openPresetCode('pack',code); } break; }
+  case 'packimport': openPresetCode('pack'); break;
   case 'packsave': { const nm=prompt('프리셋 이름'); if(!nm) break; const by=prompt('만든 사람 (선택, 공유할 때 표시돼요)')||''; const c=naiCfg(), st=(c.styles||[]).find(x=>x.id===c.styleId)||(c.styles||[])[0]||{}, L=llmSlots();
       const p={id:'u'+uid(),name:nm.trim().slice(0,30),by:by.trim().slice(0,20),desc:'내가 만든 팩',tags:st.tags||'',neg:st.neg||'',qtags:c.qtags||'',steps:c.steps,scale:c.scale,cfgRescale:c.cfgRescale,sampler:c.sampler};
       const a=userPacks(); a.unshift(p); if(saveUserPacks(a)) toast('프리셋으로 저장했어요. 내보내기로 코드를 공유할 수 있어요'); openModal(packHTML()); break; }
@@ -11990,7 +12045,7 @@ function imageCandidateEligible(kind,target,owner,mode='manual'){
 // Lock only the page/sheets below the top image dialog; keep its own scroll usable.
 function imageScrollGuard(){
  const locks=new Map();let savedPage=null,touch=null;
- const top=()=>document.getElementById('app-confirm-dialog')||document.getElementById('generated-image-preview')||document.getElementById('image-candidate-dialog')||document.getElementById('v2-icon-dialog')||(()=>{const m=document.getElementById('modal');return m&&!m.hidden&&m.querySelector('.naiprev,#np_in,#cutCv,.skp-img')?m:null;})();
+ const top=()=>document.getElementById('app-confirm-dialog')||document.getElementById('generated-image-preview')||document.getElementById('image-candidate-dialog')||document.getElementById('v2-icon-dialog')||(()=>{const m=document.getElementById('modal');return m&&!m.hidden&&m.querySelector('.naiprev,#np_in,#cutCv,.skp-img,.preset-code-sheet')?m:null;})();
  function sync(){if(typeof document==='undefined'||!document?.body)return;const root=top(),targets=root?[document.documentElement,document.body,...document.querySelectorAll('#app main,#modal>.sheet,#v2-icon-dialog>.sheet,#image-candidate-dialog>.sheet')].filter(el=>!root.contains(el)):[];
   for(const [el,old]of locks)if(!targets.includes(el)){for(const [k,v,priority]of old.styles){if(v)el.style.setProperty(k,v,priority);else el.style.removeProperty(k);}el.scrollTop=old.y;el.scrollLeft=old.x;locks.delete(el);}
   if(root&&!savedPage){savedPage={x:window.scrollX,y:window.scrollY,styles:['position','top','left','width'].map(k=>[k,document.body.style.getPropertyValue(k),document.body.style.getPropertyPriority(k)])};document.body.style.position='fixed';document.body.style.top=-savedPage.y+'px';document.body.style.left=-savedPage.x+'px';document.body.style.width='100%';}
