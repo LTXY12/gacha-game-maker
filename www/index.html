@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <script>
 (function(){
-  var BUILT='2026.10.21.10'; var REQUIRED_APK='2026.10.21.6'; window.__REQUIRED_APK__=REQUIRED_APK; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
+  var BUILT='2026.10.22.1'; var REQUIRED_APK='2026.10.21.6'; window.__REQUIRED_APK__=REQUIRED_APK; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
   function vc(a,b){a=String(a||'').split(/\D+/).map(Number);b=String(b||'').split(/\D+/).map(Number);for(var i=0;i<Math.max(a.length,b.length);i++){var x=a[i]||0,y=b[i]||0;if(x!==y)return x<y?-1:1;}return 0;}
   if(window.__LIVE__) return;
   if(window.indexedDB){window.__STORAGE_SHELL__=BUILT;return;}
@@ -10009,19 +10009,55 @@ function ghH(o,extra){ return Object.assign({Accept:'application/vnd.github+json
 async function gh(o,path,opt){ opt=opt||{}; const tries=opt.tries||0; let r; try{ r=await http('https://api.github.com/repos/'+o.repo.trim()+path,{method:opt.method||'GET',headers:ghH(o,Object.assign(opt.body?{'Content-Type':'application/json'}:{},opt.binary?{Accept:'application/vnd.github.raw+json'}:{})),body:opt.body,binary:!!opt.binary,timeout:opt.timeout||120000}); }catch(e){ if(tries<4){ await wait(2000*Math.pow(2,tries)); return gh(o,path,Object.assign({},opt,{tries:tries+1})); } throw e; }
   if(r.status>=500&&r.status<600&&tries<4){ await wait(2000*Math.pow(2,tries)); return gh(o,path,Object.assign({},opt,{tries:tries+1})); }
   if(r.status===403||r.status===429){ const t=r.text||''; if(/secondary rate|abuse|rate limit/i.test(t)&&!opt.retried){ await wait(61000); return gh(o,path,Object.assign({},opt,{retried:true})); } }
-  if(r.status>=400&&!opt.okStatus?.includes(r.status)) throw Object.assign(errOf(r),{status:r.status});
+  if(r.status>=400&&!opt.okStatus?.includes(r.status)) throw ghRequestError(r,path,opt.method||'GET');
   if(opt.binary) return r; try{ return r.text?JSON.parse(r.text):{}; }catch(e){ return {}; } }
+function ghSafeMessage(value){let text=String(value||'');for(const token of [SY().token,PUB().token])if(typeof token==='string'&&token.length>=8)text=text.split(token).join('[토큰 숨김]');return text.replace(/(?:github_pat_|gh[pousr]_)[A-Za-z0-9_]+/g,'[토큰 숨김]').replace(/Bearer\s+[^\s,;]+/gi,'Bearer [숨김]');}
+function ghRequestError(response,path,method){const error=Object.assign(errOf(response),{status:response.status,endpoint:method+' '+String(path).split('?')[0]});try{const data=JSON.parse(response.text||'{}');error.details=(Array.isArray(data.errors)?data.errors:[]).map(x=>typeof x==='string'?x:[x.resource,x.field,x.code,x.message].filter(Boolean).join(' / ')).join('; ').slice(0,500);}catch(_){}return error;}
+function ghSHA(value,label){if(typeof value!=='string'||!/^[a-f0-9]{40}$/i.test(value))throw Error(label+' 응답의 커밋·파일 번호가 올바르지 않습니다');return value;}
+function ghRefPath(o){return '/git/ref/heads/'+encodeURIComponent(String(o.branch||'main').trim());}
+async function ghEnsureBranch(o){
+ const path=ghRefPath(o);let ref=await gh(o,path,{okStatus:[404,409]});if(ref?.object?.sha){ghSHA(ref.object.sha,'브랜치');return ref;}
+ const repo=await gh(o,''),defaultBranch=repo.default_branch||'main';let initial=await gh(o,ghRefPath({branch:defaultBranch}),{okStatus:[404,409]});
+ if(!initial?.object?.sha){
+  // Only initialize an empty repository. Never overwrite an existing README to repair a missing branch.
+  try{await gh(o,'/contents/README.md',{method:'PUT',body:{message:'Initialize Maker data repository',content:bytesToB64(new TextEncoder().encode('# 가챠 게임 메이커 자료 저장소\n'))}});}catch(e){if(e.status!==409&&e.status!==422)throw e;initial=await gh(o,ghRefPath({branch:defaultBranch}),{okStatus:[404,409]});if(!initial?.object?.sha)throw e;}
+  initial=await gh(o,ghRefPath({branch:defaultBranch}));
+ }
+ ghSHA(initial?.object?.sha,'기본 브랜치');if(String(o.branch||'main').trim()===defaultBranch)return initial;
+ try{ref=await gh(o,'/git/refs',{method:'POST',body:{ref:'refs/heads/'+String(o.branch||'main').trim(),sha:initial.object.sha}});}catch(e){if(e.status!==409&&e.status!==422)throw e;ref=await gh(o,path,{okStatus:[404,409]});if(!ref?.object?.sha)throw e;}
+ ghSHA(ref?.object?.sha,'새 브랜치');return ref;
+}
+async function ghCommitFiles(o,base,entries,message){
+ let head=ghSHA(base.head,'이전 커밋'),treeSHA=ghSHA(base.treeSha,'이전 파일 목록');
+ for(let attempt=0;attempt<5;attempt++){
+  const tree=await gh(o,'/git/trees',{method:'POST',body:{base_tree:treeSHA,tree:entries}});ghSHA(tree?.sha,'파일 목록');
+  const commit=await gh(o,'/git/commits',{method:'POST',body:{message,tree:tree.sha,parents:[head]}});ghSHA(commit?.sha,'새 커밋');
+  try{
+   const result=await gh(o,'/git/refs/heads/'+encodeURIComponent(String(o.branch||'main').trim()),{method:'PATCH',body:{sha:commit.sha,force:false}});
+   if(result?.object?.sha!==commit.sha){const verified=await gh(o,ghRefPath(o));if(verified?.object?.sha!==commit.sha)throw Error('GitHub의 브랜치 반영을 확인하지 못했습니다. 성공으로 처리하지 않습니다.');}
+   return {head:commit.sha,treeSha:tree.sha};
+  }catch(e){
+   if((e.status!==409&&e.status!==422)||attempt===4)throw e;
+   const latest=await gh(o,ghRefPath(o));const next=ghSHA(latest?.object?.sha,'최신 브랜치');if(next===commit.sha)return {head:commit.sha,treeSha:tree.sha};
+   if(next===head||!(e.status===409||/fast.?forward|conflict|reference update failed/i.test(e.message||'')))throw e;
+   head=next;const current=await gh(o,'/git/commits/'+head);treeSHA=ghSHA(current?.tree?.sha,'최신 파일 목록');await wait(400+attempt*600);
+  }
+ }
+ throw Error('GitHub 반영에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+}
+async function ghCreateBlob(o,blob,label){if(blob.size>100*1048576)throw Error(label+': 파일 하나가 GitHub 전송 한도 100MiB를 넘습니다. 해당 자료를 줄여 주세요. 전체 게임의 합계 용량 제한은 아닙니다.');const result=await gh(o,'/git/blobs',{method:'POST',body:{content:bytesToB64(new Uint8Array(await blob.arrayBuffer())),encoding:'base64'},timeout:300000});ghSHA(result?.sha,label);return result;}
+async function ghUploadPool(items,task){let next=0,failure=null;await Promise.all(Array.from({length:Math.min(3,items.length)},async()=>{while(!failure&&next<items.length){const item=items[next++];try{await task(item);}catch(e){failure=failure||e;}}}));if(failure)throw failure;}
+
 function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY); if(withKeys) keys.push(PKEY); return keys; }
 function syStrip(k,v,withKeys){ if(withKeys||v==null) return v; try{ if(k===NKEY){ const o=JSON.parse(v); delete o.key; return JSON.stringify(o); } if(k===SKEY){ const o=JSON.parse(v); delete o.fishKey; delete o.elKey; return JSON.stringify(o); } }catch(e){} return v; }
 function syMerge(k,v){ if(v==null) return v; try{ if(k===NKEY){ const cur=JSON.parse(appStorage.getItem(NKEY)||'{}'), o=JSON.parse(v); if(!o.key&&cur.key) o.key=cur.key; return JSON.stringify(o); } if(k===SKEY){ const cur=JSON.parse(appStorage.getItem(SKEY)||'{}'), o=JSON.parse(v); ['fishKey','elKey'].forEach(x=>{ if(!o[x]&&cur[x]) o[x]=cur[x]; }); return JSON.stringify(o); } }catch(e){} return v; }
 let SYJOB=null;
 function syBar(t){ let el=$('#syBar'); if(!t){ if(el) el.remove(); return; } if(!el){ el=document.createElement('div'); el.id='syBar'; el.className='prepchip'; document.body.appendChild(el); } el.innerHTML=`<b>☁ ${esc(t)}</b>`; }
 async function syRemote(o){ // -> {head,tree,paths,state}
-  let ref=await gh(o,'/git/ref/heads/'+(o.branch||'main'),{okStatus:[404,409]});
-  if(!ref||!ref.object){ await gh(o,'/contents/README.md',{method:'PUT',body:{message:'init',content:bytesToB64(new TextEncoder().encode('가챠 게임 메이커 동기화 저장소 (비공개로 두세요)'))}}); ref=await gh(o,'/git/ref/heads/'+(o.branch||'main')); }
+  const ref=await ghEnsureBranch(o);
   const head=ref.object.sha, commit=await gh(o,'/git/commits/'+head), tree=await gh(o,'/git/trees/'+commit.tree.sha+'?recursive=1');
   const paths={}; (tree.tree||[]).forEach(x=>{ if(x.type==='blob') paths[x.path]=x.sha; });
-  let state=null; if(paths['sync/state.json']){ const r=await gh(o,'/git/blobs/'+paths['sync/state.json'],{binary:true}); try{ let j=JSON.parse(r.bytes?new TextDecoder().decode(r.bytes):(r.text||'')); if(j&&j.encoding==='base64'&&j.content) j=JSON.parse(new TextDecoder().decode(b64ToBytes(j.content.replace(/\s/g,'')))); state=j; }catch(e){} }
+  let state=null; if(paths['sync/state.json']){ const r=await gh(o,'/git/blobs/'+paths['sync/state.json'],{binary:true}); try{ let j=JSON.parse(r.bytes?new TextDecoder().decode(r.bytes):(r.text||'')); if(j&&j.encoding==='base64'&&j.content) j=JSON.parse(new TextDecoder().decode(b64ToBytes(j.content.replace(/\s/g,'')))); state=j; }catch(e){throw Error('GitHub의 기존 진행 정보를 해석하지 못했습니다. 덮어쓰지 않고 중단합니다.');} }
   return {head,treeSha:commit.tree.sha,paths,state};
 }
 /* ===== 게임 게시·구독 (구독형 업데이트) =====
@@ -10054,23 +10090,20 @@ async function pubUpload(notes,btn){ const P0=PUB(); if(!P0.token||!/^[\w.-]+\/[
   const o={token:P0.token,repo:P0.repo.trim(),branch:P0.branch||'main'}, M=pubMeta(), dir='games/'+M.slug, lbl=btn&&btn.textContent; PUBJOB=true; if(btn) btn.disabled=true;
   const st=m=>{ syBar(m); if(btn&&btn.isConnected) btn.textContent=m; };
   try{ st('저장소 확인 중…'); await flush();
-    let ref=await gh(o,'/git/ref/heads/'+o.branch,{okStatus:[404,409]});
-    if(!ref||!ref.object){ await gh(o,'/contents/README.md',{method:'PUT',body:{message:'init',content:bytesToB64(new TextEncoder().encode('# 가챠 게임 메이커 게시 저장소\n\n이 저장소의 게임은 가챠 게임 메이커 앱에서 구독할 수 있어요. 공개(Public)로 두세요.\n'))}}); ref=await gh(o,'/git/ref/heads/'+o.branch); }
+    const ref=await ghEnsureBranch(o);
     let hd=ref.object.sha; const cm0=await gh(o,'/git/commits/'+hd), tree0=await gh(o,'/git/trees/'+cm0.tree.sha+'?recursive=1'), have=new Set((tree0.tree||[]).filter(x=>x.type==='blob').map(x=>x.path));
     const game=pubContent(), objs=imgObjsOf(game).filter(x=>x.img), imap={}, byHash={}, idx=syIdx(); let i=0;
     for(const x of objs){ i++; if(i%10===0) st(`그림 확인 ${i}/${objs.length}`); const b=await idbGetNS(x.id); if(!b){ x.img=null; continue; } const k=IMGNS+x.id, e=idx[k]; let h=e&&e.size===b.size&&e.hash; if(!h){ h=await shaHex(await b.arrayBuffer()); idx[k]={hash:h,size:b.size}; } imap[x.id]=h; byHash[h]=byHash[h]||b; x.img={idb:true}; }
     saveSyIdx(idx); game.images=imap;
     const need=Object.keys(byHash).filter(h=>!have.has(dir+'/b/'+h)), entries=[]; let done=0, nextAt=0, qi=0;
     const pace=async()=>{ const now=Date.now(), t=Math.max(now,nextAt); nextAt=t+850; if(t>now) await wait(t-now); };
-    const worker=async()=>{ while(qi<need.length){ const h=need[qi++]; await pace(); const r=await gh(o,'/git/blobs',{method:'POST',body:{content:bytesToB64(new Uint8Array(await byHash[h].arrayBuffer())),encoding:'base64'}}); entries.push({path:dir+'/b/'+h,mode:'100644',type:'blob',sha:r.sha}); done++; st(`그림 올리는 중 ${done}/${need.length}`); } };
-    await Promise.all([worker(),worker(),worker()]);
+    await ghUploadPool(need,async h=>{await pace();const r=await ghCreateBlob(o,byHash[h],`그림 ${done+1}/${need.length}`);entries.push({path:dir+'/b/'+h,mode:'100644',type:'blob',sha:r.sha});done++;st(`그림 올리는 중 ${done}/${need.length}`);});
     const ver=M.ver+1, man={app:'gacha-game-maker',kind:'pub',v:1,title:G.meta.title,sub:G.meta.sub||'',ver,at:Date.now(),build:APP_BUILD,notes:String(notes||'').slice(0,2000),images:Object.keys(imap).length,chapters:game.chapters.filter(c=>c.kind==='main').length,events:(game.events||[]).length,chars:(game.chars||[]).length};
     game.meta.pub={slug:M.slug,ver}; st('게임 올리는 중…');
-    const gb=await gh(o,'/git/blobs',{method:'POST',body:{content:bytesToB64(new TextEncoder().encode(JSON.stringify(game))),encoding:'base64'},timeout:300000});
-    const mb=await gh(o,'/git/blobs',{method:'POST',body:{content:bytesToB64(new TextEncoder().encode(JSON.stringify(man,null,1))),encoding:'base64'}});
+    const gb=await ghCreateBlob(o,new Blob([JSON.stringify(game)]),'게임 정보');
+    const mb=await ghCreateBlob(o,new Blob([JSON.stringify(man,null,1)]),'게시 정보');
     entries.push({path:dir+'/game.json',mode:'100644',type:'blob',sha:gb.sha},{path:dir+'/manifest.json',mode:'100644',type:'blob',sha:mb.sha});
-    for(let k=0;k<5;k++){ const base=(await gh(o,'/git/commits/'+hd)).tree.sha, tree=await gh(o,'/git/trees',{method:'POST',body:{base_tree:base,tree:entries}}), cm=await gh(o,'/git/commits',{method:'POST',body:{message:`${G.meta.title} v${ver}`,tree:tree.sha,parents:[hd]}});
-      const r=await gh(o,'/git/refs/heads/'+o.branch,{method:'PATCH',body:{sha:cm.sha},okStatus:[409,422]}); if(!(r&&r.message&&/fast.?forward|conflict|reference/i.test(r.message))) break; hd=(await gh(o,'/git/ref/heads/'+o.branch)).object.sha; if(k===4) throw {message:'저장소가 계속 바뀌고 있어요. 잠시 뒤 다시 시도해 주세요'}; }
+    await ghCommitFiles(o,{head:hd,treeSha:cm0.tree.sha},entries,`${G.meta.title} v${ver}`);
     M.ver=ver; M.at=man.at; M.repo=o.repo; M.branch=o.branch; mark('meta');
     openModal(`${head('게시했어요',`<span class="muted">「${esc(G.meta.title)}」 v${ver}</span>`)}
       <p style="margin:0 0 6px">이 주소를 받은 사람은 설정 → 게임 → 🔗 게임 구독에 넣으면 이 게임을 받고, 다음 게시부터 자동으로 업데이트를 받아요.</p>
@@ -10146,25 +10179,15 @@ async function syPush(force){
     saveSyIdx(idx);
     const need=[...new Set(Object.values(bin))].filter(h=>!R.paths['sync/b/'+h]); let entries=[];
     const byHash={}; Object.entries(bin).forEach(([k,h])=>{ byHash[h]=byHash[h]||k; });
-    const br=o.branch||'main'; let hd=R.hd, baseTree=R.treeSha, committing=null, done=0, nextAt=0;
+    const br=o.branch||'main'; let hd=R.head, baseTree=R.treeSha, committing=null, done=0, nextAt=0;
     const pace=async()=>{ const now=Date.now(), t=Math.max(now,nextAt); nextAt=t+850; if(t>now) await wait(t-now); };
-    const commitPart=async(part,msg)=>{ for(let k=0;k<5;k++){
-        const tree=await gh(o,'/git/trees',{method:'POST',body:{base_tree:baseTree,tree:part}}); const cm=await gh(o,'/git/commits',{method:'POST',body:{message:msg,tree:tree.sha,parents:[hd]}});
-        const r=await gh(o,'/git/refs/heads/'+br,{method:'PATCH',body:{sha:cm.sha},okStatus:[409,422]});
-        if(!(r&&r.message&&/fast.?forward|conflict|reference/i.test(r.message))){ hd=cm.sha; baseTree=tree.sha; return; }
-        // 그 사이에 저장소가 바뀌었어요(예: 다른 기기 표시 파일) → 최신 위에 다시 얹기
-        const ref=await gh(o,'/git/ref/heads/'+br); hd=ref.object.sha; baseTree=(await gh(o,'/git/commits/'+hd)).tree.sha; await wait(400+k*600); }
-      throw {message:'저장소가 계속 바뀌고 있어요. 다른 기기에서 동시에 올리는 중인지 확인하고 잠시 뒤 다시 시도해 주세요'}; };
+    const commitPart=async(part,msg)=>{const committed=await ghCommitFiles({...o,branch:br},{head:hd,treeSha:baseTree},part,msg);hd=committed.head;baseTree=committed.treeSha;};
     const flushPart=async()=>{ if(committing) return committing; if(!entries.length) return; const part=entries; entries=[]; committing=commitPart(part,`sync 그림 ${done}/${need.length}`).catch(e=>{ entries=part.concat(entries); throw e; }).finally(()=>{ committing=null; }); return committing; };
-    let qi=0;
-    const worker=async()=>{ while(qi<need.length){ const h=need[qi++]; const b=await idbGet(byHash[h]); if(!b) continue; await pace();
-        const r=await gh(o,'/git/blobs',{method:'POST',body:{content:bytesToB64(new Uint8Array(await b.arrayBuffer())),encoding:'base64'}}); entries.push({path:'sync/b/'+h,mode:'100644',type:'blob',sha:r.sha}); done++;
-        syBar(`그림 올리는 중 ${done}/${need.length}`); if(entries.length>=40) await flushPart(); } };
-    await Promise.all([worker(),worker(),worker()]); if(committing) await committing;
+    await ghUploadPool(need,async h=>{const b=await idbGet(byHash[h]);if(!b)throw Error('올릴 자료 파일을 찾지 못했습니다');await pace();const r=await ghCreateBlob(o,b,`자료 ${done+1}/${need.length}`);entries.push({path:'sync/b/'+h,mode:'100644',type:'blob',sha:r.sha});done++;syBar(`자료 올리는 중 ${done}/${need.length}`);if(entries.length>=40)await flushPart();});if(committing)await committing;
     const withKeys=!!o.keys; let ls={}; syLsKeys(withKeys).forEach(k=>{ const v=appStorage.getItem(k); if(v!=null) ls[k]=syStrip(k,v,withKeys); }); ls=lsHoldMerge(ls,R.state&&R.state.ls);
     const state={v:1,at:Date.now(),device:syDevice(),devId:devId(),build:APP_BUILD,ls,bin,types};
     syBar('게임 진행 저장하는 중…');
-    const sb=await gh(o,'/git/blobs',{method:'POST',body:{content:bytesToB64(new TextEncoder().encode(JSON.stringify(state))),encoding:'base64'},timeout:300000});
+    const sb=await ghCreateBlob(o,new Blob([JSON.stringify(state)]),'진행 정보');
     entries.push({path:'sync/state.json',mode:'100644',type:'blob',sha:sb.sha});
     await commitPart(entries,`sync ${state.device} ${new Date(state.at).toISOString()}`); entries=[];
     const o2=SY(); o2.last=state.at; o2.lastDir='up'; o2.localAt=G.prog.savedAt||Date.now(); saveSY(o2);
@@ -10190,7 +10213,8 @@ async function syPull(){
   }catch(e){ PULLERR='받기 실패. '+syErr(e); toast(PULLERR); return false; }
   finally{ SYJOB=null; syBar(''); }
 }
-function syErr(e){ if(e&&e.status===404) return '저장소를 찾지 못했어요. 이름과 토큰 권한(Contents 읽기/쓰기)을 확인해 주세요.'; if(e&&(e.status===401||e.status===403)) return '토큰이 올바르지 않거나 이 저장소에 쓰기 권한이 없어요.'; return AIERR[e&&e.code]||((e&&e.message)||'다시 시도해 주세요'); }
+function syErr(e){let message=e?.status===404?'저장소·브랜치를 찾지 못했습니다. 이름과 토큰 권한을 확인해 주세요.':e?.status===401||e?.status===403?'토큰 또는 저장소 쓰기 권한을 확인해 주세요.':AIERR[e?.code]||e?.message||'다시 시도해 주세요';if(e?.status)message=`HTTP ${e.status} · `+message;if(e?.endpoint)message+=' · 단계: '+e.endpoint;if(e?.details)message+=' · '+e.details;return ghSafeMessage(message).slice(0,1000);}
+
 async function syCheckOnStart(){
   const o=SY(); if(!syReady()||o.auto===false) return; if(window.__BOOTSYNC){ setTimeout(syCheckOnStart,1500); return; }
   try{ const R=await syRemote(o); const S=R.state; if(!S||S.at<=(o.last||0)||S.device===syDevice()) return;
