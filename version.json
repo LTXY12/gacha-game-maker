@@ -1,13 +1,15 @@
 {
-  "build": "2026.10.21.3",
-  "notes": [],
+  "build": "2026.10.21.4",
+  "notes": [
+    "저장 관련 버그 픽스"
+  ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "a1792e1616f1ee4ad763dfd18f321073352f83bbc022ffc7c0992e97e7bca707",
+  "sha256": "4869260d0abec7cf67bd59fee7259a55ae8565dc61a9de60bd6f724ccdb596ce",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest/download/gacha-game-maker.apk",
-    "build": "2026.10.21.3"
+    "build": "2026.10.21.4"
   },
   "feedback": "",
-  "at": "2026-10-21T02:20:47.433945Z"
+  "at": "2026-10-21T02:56:09.619579Z"
 }
