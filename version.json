@@ -1,16 +1,16 @@
 {
-  "build": "2026.10.22.2",
+  "build": "2026.10.22.10",
   "notes": [
-    "각종 버그 픽스"
+    "프롬프트 개선, 공유팩 불러오기 관련 버그 수정"
   ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "09f441dd2b1247d593439e85a3a2a472518a99776e1cb37c4ab5e5671db435cb",
+  "sha256": "b9f6ddba736c2c0465da0d2c3d0c3fa78705da8358c50d7710383719a9a40ac7",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest",
-    "build": "2026.10.22.2",
+    "build": "2026.10.22.10",
     "minShell": "2026.10.21.6"
   },
   "feedback": "",
-  "at": "2026-10-21T23:05:51.508074Z"
+  "at": "2026-10-22T15:14:57.608230Z"
 }
