@@ -4366,8 +4366,8 @@ function gkey(k){ return k+'::'+__GID; }
 function readShared(k,g,fields){ let o={}; try{o=JSON.parse(appStorage.getItem(k))||{};}catch(e){} let s={}; try{s=JSON.parse(appStorage.getItem(g))||{};}catch(e){} fields.forEach(f=>{ if(s[f]!=null&&s[f]!=='') o[f]=s[f]; }); return o; }
 function writeShared(k,g,fields,o){ try{ const c=JSON.parse(JSON.stringify(o||{})); let s={}; try{s=JSON.parse(appStorage.getItem(g))||{};}catch(e){} fields.forEach(f=>{ if(c[f]!=null){ s[f]=c[f]; delete c[f]; } }); try{appStorage.setItem(g,JSON.stringify(s));}catch(e2){} try{appStorage.setItem(k,JSON.stringify(c));}catch(e3){} }catch(e){} }
 (function(){ ['starfall-ai-profiles','starfall-nai','ggm-packs','starfall-sound','ggm-sync'].forEach(k=>{ try{ const g=k+'::'+__GID; if(appStorage.getItem(g)==null){ const o=appStorage.getItem(k); if(o!=null) appStorage.setItem(g,o); } }catch(e){} }); })();
-function naiWrite(o){ writeShared(NKEY,'starfall-nai',['key','endpoint'],o); }
-function sndWrite(o){ writeShared(SKEY,'starfall-sound',['fishKey','elKey','elBase'],o); }
+function naiWrite(o){ writeShared(NKEY,'starfall-nai',['key','endpoint'],o); scheduleSyncPush(); }
+function sndWrite(o){ writeShared(SKEY,'starfall-sound',['fishKey','elKey','elBase'],o); scheduleSyncPush(); }
 const AKEY='starfall-ai', PKEY=gkey('starfall-ai-profiles'), NKEY=gkey('starfall-nai');
 const AITYPE={anthropic:'Claude API',vertex:'Google Vertex AI',gemini:'Gemini API (AI Studio)',openai:'OpenAI 호환 (OpenRouter 등)',copilot:'GitHub Copilot (구독 필요)'};
 const DEFM={anthropic:['claude-sonnet-5-5','claude-haiku-4-5-20251001'],gemini:['gemini-2.5-pro','gemini-2.5-flash'],vertex_google:['gemini-2.5-pro','gemini-2.5-flash'],vertex_anthropic:['',''],openai:['',''],copilot:['gpt-4.1','gpt-4.1']};
@@ -4386,7 +4386,7 @@ function saveAIP(d){
   try{ appStorage.setItem('starfall-ai-profiles',JSON.stringify({active:'',fallback:d.fallback!==false,list:d.list||[]})); }catch(e){}
   const models={}; (d.list||[]).forEach(pr=>{ if(String(pr.model||'').trim()||String(pr.quick||'').trim()) models[pr.id]={model:pr.model||'',quick:pr.quick||''}; });
   try{ appStorage.setItem(PKEY,JSON.stringify({active:d.active,fb:d.fallback,models})); }catch(e){}
-  setupAI();
+  setupAI(); scheduleSyncPush();
 }
 function defKey(p){return p.type==='vertex'?'vertex_'+(p.pub||'google'):p.type;}
 function normBase(b){ let s=String(b||'').trim().replace(/\/+$/,'').replace(/\/chat\/completions$/i,'').replace(/\/+$/,'');
@@ -4789,7 +4789,7 @@ function pthumbHTML(id,cls){ const t=pthumb(id); return t?`<img class="pthumb ${
 async function thumbData(file){ const b=await shrink(file,160); return await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(b); }); }
 function allPresets(){ return [...STYLE_PRESETS,...userPacks().filter(p=>p.tags!=null||p.neg!=null)]; }
 function llmSlots(){ let o={}; try{ o=JSON.parse(appStorage.getItem(LLMKEY)||'{}')||{}; }catch(e){} const L=Object.assign({top:'',mid:'',bot:'',tag:''},o); L.presets=Array.isArray(o.presets)?o.presets:[]; return L; }
-function saveLlm(L){ try{ appStorage.setItem(LLMKEY,JSON.stringify(L)); return true; }catch(e){ toast('저장 공간이 부족해요'); return false; } }
+function saveLlm(L){ try{ appStorage.setItem(LLMKEY,JSON.stringify(L)); scheduleSyncPush(); return true; }catch(e){ toast('저장 공간이 부족해요'); return false; } }
 /* 지침 프리셋: 이름 붙여 저장해 두고 켜고 끄는 지침. 켜진 것만 자리(상단·중단·하단)에 이어 붙여요 */
 function llmEff(L){ L=L||llmSlots(); const o={top:L.top||'',mid:L.mid||'',bot:L.bot||'',tag:L.tag||''}; L.presets.filter(x=>x&&x.on&&String(x.text||'').trim()).forEach(x=>{ const k=['top','mid','bot','tag'].includes(x.pos)?x.pos:'top'; o[k]=(o[k]?o[k].trim()+'\n':'')+String(x.text).trim(); }); return o; }
 const llmCode=p=>'GGMLLM:'+btoa(unescape(encodeURIComponent(JSON.stringify({name:p.name,pos:p.pos,text:p.text}))));
@@ -5542,6 +5542,8 @@ async function srcToBlob(src){ return await (await fetch(src)).blob(); }
 
 /* ---- ComfyUI (local / remote server) ---- */
 function aiIsLocal(){ try{ const A=AIP(), p=(A.list||[]).find(x=>x.id===A.active)||(A.list||[])[0]; return !!(p&&p.base&&/127\.0\.0\.1|localhost/i.test(String(p.base))); }catch(e){ return false; } }
+let __SYNCPUSH_T=null;
+function scheduleSyncPush(){ if(!PCS()||PCJOB) return; clearTimeout(__SYNCPUSH_T); __SYNCPUSH_T=setTimeout(()=>{ try{ pcPush(true).catch(()=>{}); }catch(e){} },1000); }
 function autoArtDef(c){ return (c&&c.provider)?'ask':'auto'; }
 function autoArtOf(c){ return (c&&c.autoArt)||autoArtDef(c); }
 function imgProvider(){return naiCfg().provider==='comfy'?'comfy':'nai';}
@@ -10393,7 +10395,18 @@ async function lsApply(ls,mapv,prefix){
  const extraSync=k=>/^(starfall-nai|starfall-sound|starfall-ai-profiles|ggm-packs)::/.test(k); /* 다른 게임의 게임별 설정도 받아요 */
  for(const[k,raw]of Object.entries(ls)){if(!GGMStorage.managed(k)&&!allowed.has(k)&&!extraSync(k))continue;if(typeof raw!=='string')throw Error('받은 저장 항목 형식이 올바르지 않습니다');const v=mapv?mapv(k,raw):raw;if(v==null)continue;if(GGMStorage.managed(k)){if(k!==PJKEY&&!Array.isArray(JSON.parse(v)?.chars))throw Error('받은 게임 자료를 확인하지 못했습니다');records[k]=v;}else prefs[k]=v;}
  const active=records[pjKey(pj.active)];if(!active)throw Error('선택한 게임의 저장 데이터가 빠져 있습니다');
- const old={};try{for(const[k,v]of Object.entries(prefs)){old[k]=appStorage.getItem(k);appStorage.setItem(k,v);}await appStorage.commitRecords(records,prefix||null);}
+ const old={};try{
+  /* 초안 보관함은 덮어쓰지 않고 병합해요 — 로컬의 새 초안이 서버의 옛 초안으로 지워지는 것 방지 */
+  if('ggm-drafts' in prefs){
+    try{
+      const local=JSON.parse(appStorage.getItem('ggm-drafts')||'[]');
+      const remote=JSON.parse(prefs['ggm-drafts']||'[]');
+      const byId=new Map();
+      [...remote,...local].forEach(d=>{ if(d&&d.id) byId.set(d.id,d); }); // 로컬이 나중 → 우선
+      prefs['ggm-drafts']=JSON.stringify([...byId.values()].slice(0,30));
+    }catch(e){}
+  }
+  for(const[k,v]of Object.entries(prefs)){old[k]=appStorage.getItem(k);appStorage.setItem(k,v);}await appStorage.commitRecords(records,prefix||null);}
  catch(e){for(const[k,v]of Object.entries(old))try{v===null?appStorage.removeItem(k):appStorage.setItem(k,v);}catch(ignore){}throw e;}
  try{appStorage.removeItem('ggm-sync-hold');}catch(e){}return {ok:true,hold:[],at:JSON.parse(active).prog?.savedAt||0};
 }
@@ -10586,7 +10599,7 @@ async function ghUploadPool(items,task){let next=0,failure=null;await Promise.al
 const PLUGKEY='starfall-plugs';
 function plugStore(){ try{ return JSON.parse(localStorage.getItem(PLUGKEY))||[]; }catch(e){ return []; } }
 
-function savePlugStore(a){ try{ localStorage.setItem(PLUGKEY,JSON.stringify(a)); }catch(e){} }
+function savePlugStore(a){ scheduleSyncPush(); try{ localStorage.setItem(PLUGKEY,JSON.stringify(a)); }catch(e){} }
 
 function plugCards(){
   const L=plugStore();
@@ -10608,7 +10621,6 @@ function openPlugins(){
 function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY,PACKKEY,'starfall-plugs','ggm-img-prov','starfall-ai-profiles','starfall-nai','starfall-sound','ggm-sync','ggm-packs',
   /* 초안·생성지침 — 절대 빠뜨리지 말 것 */
   'ggm-drafts','ggm-draft2','ggm-ng-draft','ggm-llmslot'); if(withKeys) keys.push(PKEY); return keys; }
-function syLsKeys(withKeys){ const pj=PJ(); const keys=[PJKEY,SETUP_KEY,...pj.list.map(x=>pjKey(x.id))]; keys.push(NKEY,SKEY); if(withKeys) keys.push(PKEY); return keys; }
 function syStrip(k,v,withKeys){ if(withKeys||v==null) return v; try{ if(k===NKEY){ const o=JSON.parse(v); delete o.key; return JSON.stringify(o); } if(k===SKEY){ const o=JSON.parse(v); delete o.fishKey; delete o.elKey; return JSON.stringify(o); } }catch(e){} return v; }
 function syMerge(k,v){ if(v==null) return v; try{ if(k===NKEY){ const cur=JSON.parse(appStorage.getItem(NKEY)||'{}'), o=JSON.parse(v); if(!o.key&&cur.key) o.key=cur.key; return JSON.stringify(o); } if(k===SKEY){ const cur=JSON.parse(appStorage.getItem(SKEY)||'{}'), o=JSON.parse(v); ['fishKey','elKey'].forEach(x=>{ if(!o[x]&&cur[x]) o[x]=cur[x]; }); return JSON.stringify(o); } }catch(e){} return v; }
 let SYJOB=null;
@@ -11990,7 +12002,7 @@ case 'metasave': { if($('#ng_story')&&$('#ng_story').value.trim().length>100000)
 case 'draft-open': openDraft(); break;
 case 'drlib': { drRead(); const ex=$('#drLib'); if(ex){ ex.remove(); break; } const top=document.querySelector('#drPage .dr-top'); if(top) top.insertAdjacentHTML('afterend',drLibHTML()); break; }
 case 'drlibsave': { drRead(); const nm=prompt('초안 이름',drName(DR2)); if(nm===null) break; const a=drLib(), name=nm.trim()||drName(DR2), old=a.find(x=>x.name===name);
-      if(old&&!(await appConfirm(`「${name}」 초안을 덮어쓸까요?`))) break; const rec={id:old?old.id:'d'+uid(),name,at:Date.now(),d:drClean(DR2)}; const b=a.filter(x=>x!==old); b.unshift(rec); if(drLibSave(b)){ toast('초안을 저장했어요'); const ex=$('#drLib'); if(ex) ex.outerHTML=drLibHTML(); } break; }
+      if(old&&!(await appConfirm(`「${name}」 초안을 덮어쓸까요?`))) break; const rec={id:old?old.id:'d'+uid(),name,at:Date.now(),d:drClean(DR2)}; const b=a.filter(x=>x!==old); b.unshift(rec); if(drLibSave(b)){ toast('초안을 저장했어요'); scheduleSyncPush(); const ex=$('#drLib'); if(ex) ex.outerHTML=drLibHTML(); } break; }
 case 'drlibload': { const x=drLib().find(y=>y.id===id); if(!x) break; drRead(); if(drText(DR2).trim()&&!(await appConfirm('지금 쓰던 초안 대신 불러올까요? (지금 초안은 먼저 보관함에 저장해 두세요)'))) break; drLoadFrom(x.d,x.name); break; }
 case 'drreuseoff': drRead(); delete DR2.reuse; drSave(); openDraft(); toast('그림을 새로 그리는 초안으로 바꿨어요'); break;
 case 'drxcur': drRead(); openDraftExport(drName(DR2),DR2,()=>{ openDraft(); }); break;
@@ -12868,7 +12880,7 @@ applyMeta(); (async()=>{ if(PCS()||syReady()){ if(await bootSync()) return; } co
 /* =========================================================
    독립 앱 전용: AI 연결, 백업 파일, 안드로이드 뒤로가기
    ========================================================= */
-setupAI(); render(); loadAudio().then(()=>sceneBgm());
+setupAI(); scheduleSyncPush(); render(); loadAudio().then(()=>sceneBgm());
 (()=>{ const o=LV();
   if(window.__LIVE__){ o.boots=0; saveLV(o); }
   if(o.failed){ o.failed=false; if(o.build) o.badBuild=o.build; saveLV(o); setTimeout(()=>toast('새 버전이 실행되지 않아 설치 버전으로 돌아왔어요'),1500); }
