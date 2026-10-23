@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <script>
 (function(){
-  var BUILT='2026.10.22.10'; var REQUIRED_APK='2026.10.21.6'; window.__REQUIRED_APK__=REQUIRED_APK; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
+  var BUILT='2026.10.23.1'; var REQUIRED_APK='2026.10.21.6'; window.__REQUIRED_APK__=REQUIRED_APK; window.APP_BUILD=BUILT; window.__SHELL__=window.__SHELL__||BUILT;
   function vc(a,b){a=String(a||'').split(/\D+/).map(Number);b=String(b||'').split(/\D+/).map(Number);for(var i=0;i<Math.max(a.length,b.length);i++){var x=a[i]||0,y=b[i]||0;if(x!==y)return x<y?-1:1;}return 0;}
   if(window.__LIVE__) return;
   if(window.indexedDB){window.__STORAGE_SHELL__=BUILT;return;}
@@ -992,6 +992,8 @@ body.lb-hidden .top,body.lb-hidden .tabs{opacity:0;pointer-events:none}
 .cs-art.up img.art{object-position:50% 0;transform-origin:50% 25%}
 .cs-frame{position:absolute;left:12px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:4;padding:4px 12px;font-size:.75rem;font-weight:700;color:#fff;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.3)}
 
+
+.cs-sheet [data-character-preview]{cursor:zoom-in}.cs-sheet [data-character-preview]:focus-visible{outline:2px solid var(--rose);outline-offset:-3px}.standing-box img{object-fit:contain}
 /* ===== 도감 ===== */
 .cx-head{padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--rose);margin-bottom:10px}
 .cx-meter b{font-family:var(--en);font-size:1.8rem;font-weight:800;color:var(--rose)}.cx-meter span{margin-left:6px;color:var(--sub);font-size:.85rem}
@@ -3794,7 +3796,7 @@ async function v2IconClick(event){
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='v2icons')v2OpenIcons(b.dataset.id);if(b.dataset.act==='v2standing'){const c=charById(b.dataset.id);if(!c||playMode())return;c.useStanding=c.useStanding===false;b.setAttribute('aria-checked',String(c.useStanding));mark('c:'+c.id);setTimeout(()=>{if(document.querySelector('.cs-sheet')?.dataset.cid===c.id)openChar(c.id);},180);}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&V2ICONS&&!document.getElementById('generated-image-preview')&&!(typeof IMAGE_CANDIDATES!=='undefined'&&IMAGE_CANDIDATES)){e.preventDefault();e.stopImmediatePropagation();v2IconClick({target:document.querySelector('[data-icon-act="back"],[data-icon-act="close"]')});}},true);
 
-const V2STANDING_HELP='켜면 스탠딩 그림을 사용합니다. 끄면 전투·편성·스토리 등 모든 스탠딩 표시를 상반신 그림으로 대체합니다. 스킨은 스킨 상반신, 없으면 기본 상반신을 사용해요. 상반신이 없으면 미등록으로 표시해요. 기존 스탠딩은 보관되며 다시 켜서 사용할 수 있어요.';
+const V2STANDING_HELP='켜면 스탠딩 그림을 사용합니다. 끄면 전투·편성·스토리 등 모든 스탠딩 표시를 상반신 그림으로 대체합니다. 스킨은 스킨 상반신, 없으면 기본 상반신을 사용해요. 상반신이 없으면 미등록으로 표시해요. 기존 스탠딩은 보관되며 다시 켜서 사용할 수 있어요. 상세정보 상단의 전신 전환과 외형 탭에서는 이 설정과 관계없이 등록된 원본을 확인할 수 있어요.';
 function v2StandingHeader(c){return `<div class="v2-standing-header"><h3 class="sec">스탠딩 (전투·편성·${esc(T('crew'))} 화면)</h3><div class="v2-standing-controls"><button class="v2-help" data-act="v2standhelp" aria-label="스탠딩 사용 도움말" aria-expanded="false">?</button><span>스탠딩 사용</span><button class="v2-switch" role="switch" aria-checked="${c.useStanding!==false}" aria-label="스탠딩 이미지 사용" data-act="v2standing" data-id="${c.id}"><span></span></button></div></div>`;}
 function v2CloseStandingHelp(){document.getElementById('v2-standing-help')?.remove();document.querySelectorAll('[data-act="v2standhelp"]').forEach(b=>b.setAttribute('aria-expanded','false'));}
 function v2StandingHelp(button){const open=button.getAttribute('aria-expanded')==='true';v2CloseStandingHelp();if(open)return;button.setAttribute('aria-expanded','true');const bubble=document.createElement('div');bubble.id='v2-standing-help';bubble.className='v2-help-bubble';bubble.setAttribute('role','note');bubble.textContent=V2STANDING_HELP;button.closest('.v2-standing-header').append(bubble);}
@@ -8349,12 +8351,26 @@ function guideText(){
 }
 let CS_TAB='equip';
 function crewOrder(){return [...G.chars].sort((a,b)=>(own(b.id)?1:0)-(own(a.id)?1:0)||b.rarity-a.rarity||(a.ord||0)-(b.ord||0));}
+// Detail is an original-art viewer, independent of the gameplay standing preference.
+function characterDetailArt(c,upper=false){
+ const sk=skinOf(c),pick=o=>o&&(upper?imgSrcRaw(o.upper)||imgSrcRaw(o):imgSrcRaw(o)||imgSrcRaw(o.upper));
+ const src=pick(sk)||pick(c),up=!!src&&(src===imgSrcRaw(sk?.upper)||src===imgSrcRaw(c.upper));
+ return src?`<img class="art ${up?'upimg':''}" src="${esc(src)}" alt="${esc(c.name)}" loading="lazy" draggable="false">`:`<div class="art ph"><small>이미지 미등록</small></div>`;
+}
+function characterDetailPreviewTargets(root){
+ const locked=new Set([...root.querySelectorAll('[data-cs=look] .locked img')].map(img=>img.src));
+ for(const img of root.querySelectorAll('[data-cs="look"] img')){
+  if(img.closest('.locked')||locked.has(img.src))continue;
+  img.dataset.characterPreview='true';img.tabIndex=0;img.setAttribute('role','button');
+  img.setAttribute('aria-label',(img.alt||'캐릭터 이미지')+' 크게 보기');
+ }
+}
 function openChar(id){
   const c=charById(id); if(!c) return; MBACK=null; const o=own(c.id),st=stats(c);
   const eps=[...c.episodes].sort((a,b)=>a.lv-b.lv), ths=G.threads.filter(t=>t.charId===c.id), cap=o?levelCap(o):20;
   const old=$('#modal .sheet.cs-sheet'), keep=old&&old.dataset.cid===id?old.scrollTop:0;
   const list=crewOrder(), i=list.findIndex(x=>x.id===id), prev=list[(i-1+list.length)%list.length], next=list[(i+1)%list.length];
-  const lbs=imgSrc(c.lbcg), cgOpen=!!(o&&o.dup>=5), skinSel=o&&o.skin, ill=c.illust?imgSrc(c.illust):null, wearing=skinOf(c), sec=(k,h)=>`<section data-cs="${k}" ${CS_TAB===k?'':'hidden'}>${h}</section>`;
+  const lbs=imgSrcRaw(c.lbcg), cgOpen=!!(o&&o.dup>=5), skinSel=o&&o.skin, ill=c.illust?imgSrcRaw(c.illust):null, wearing=skinOf(c), sec=(k,h)=>`<section data-cs="${k}" ${CS_TAB===k?'':'hidden'}>${h}</section>`;
   const equip=`
     ${v2EquipmentCard(c,o)}
     ${v2SkillSummary(c)}
@@ -8375,7 +8391,8 @@ function openChar(id){
     <div class="row" style="margin:0 0 4px"><button class="btn sm ghost" data-act="imglib" data-id="${c.id}">🖼 그림 모아 보기</button></div>
     ${v2StandingHeader(c)}
     <p class="muted" style="margin:0 0 6px">배경 없는 전신 그림이에요. ${T('crew')} 목록과 ${T('talk')}에서는 위쪽(상반신, 얼굴)만 잘라서 보여 줘요.</p>
-    <div class="row"><button class="btn sm" data-act="naigen" data-k="char" data-id="${c.id}">NAI로 스탠딩</button><button class="btn sm ghost" data-act="upload" data-k="char" data-id="${c.id}">이미지 올리기</button>${imgSrc(c)?`<button class="btn sm ghost" data-act="cutopen" data-k="char" data-id="${c.id}">배경 지우기</button>`+XBTN('char',c.id,'','지우기'):''}</div>
+    <div class="ill-box standing-box">${imgSrcRaw(c)?`<img src="${esc(imgSrcRaw(c))}" alt="${esc(c.name)} 스탠딩">`:'<span>스탠딩 이미지가 아직 없어요</span>'}</div>
+    <div class="row"><button class="btn sm" data-act="naigen" data-k="char" data-id="${c.id}">NAI로 스탠딩</button><button class="btn sm ghost" data-act="upload" data-k="char" data-id="${c.id}">이미지 올리기</button>${imgSrcRaw(c)?`<button class="btn sm ghost" data-act="cutopen" data-k="char" data-id="${c.id}">배경 지우기</button>`+XBTN('char',c.id,'','지우기'):''}</div>
     <h3 class="sec">상반신 (스토리·프로필)</h3>
     <p class="muted" style="margin:0 0 6px">배경 없는 상반신 그림이에요. 있으면 스토리와 ${T('crew')} 프로필에서 전신을 잘라 쓰는 대신 이 그림을 써요. 표정 그림이 있는 장면에서는 표정이 먼저예요.</p>
     <div class="ill-box up-box">${c.upper&&imgSrc(c.upper)?`<img src="${esc(imgSrc(c.upper))}" alt="">`:'<span>아직 없어요 · 없으면 전신 위쪽을 잘라서 보여 줘요</span>'}</div>
@@ -8391,16 +8408,16 @@ function openChar(id){
     <p class="muted" style="margin:0 0 6px">배경까지 그려진 세로 한 장 그림이에요. 타이틀과 ${T('gacha')} 픽업 화면에 쓰이며, 로비에서는 표시 방식을 ‘일러스트 표시’로 골랐을 때 사용해요.</p>
     <div class="ill-box">${ill?`<img src="${esc(ill)}" alt="">`:'<span>아직 없어요</span>'}</div>
     <label class="f" for="il_scene">장면·배경 태그 (선택)</label><input class="in" id="il_scene" value="${esc(c.illust.prompt||'')}" placeholder="night, city lights, rooftop, wind, from below">
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="ilgen" data-k="illust" data-id="${c.id}">NAI로 일러스트</button><button class="btn sm ghost" data-act="upload" data-k="illust" data-id="${c.id}">올리기</button>${ill?`<button class="btn sm ghost" data-act="cgview" data-k="illust" data-id="${c.id}">크게</button><button class="btn sm ghost" data-act="ildel" data-k="illust" data-id="${c.id}">지우기</button>`:''}</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="ilgen" data-k="illust" data-id="${c.id}">NAI로 일러스트</button><button class="btn sm ghost" data-act="upload" data-k="illust" data-id="${c.id}">올리기</button>${ill?`<button class="btn sm ghost" data-act="ildel" data-k="illust" data-id="${c.id}">지우기</button>`:''}</div>
     <h3 class="sec">최대 ${esc(T('limit'))} CG</h3>
     <p class="muted" style="margin:0 0 6px">${esc(T('limit'))} 5단계를 달성하면 공개되는 특별 일러스트예요. 미리 만들어 두면 달성하는 순간 연출과 함께 열려요. 공개 후에는 로비에도 쓸 수 있어요.</p>
     <div class="ill-box ${cgOpen?'':'locked'}">${lbs?`<img src="${esc(lbs)}" alt="">`:'<span>아직 없어요</span>'}${cgOpen?'':`<div class="lockcap">🔒 ${esc(T('limit'))} 5단계에서 공개<small>${o?o.dup:0} / 5</small></div>`}</div>
     <label class="f" for="lb_scene">장면 태그 (선택)</label><input class="in" id="lb_scene" value="${esc(c.lbcg.prompt||'')}" placeholder="night sky, shooting stars, reaching out, smile, wind">
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="ilgen" data-k="lbcg" data-id="${c.id}">NAI로 ${esc(T('limit'))} CG</button><button class="btn sm ghost" data-act="upload" data-k="lbcg" data-id="${c.id}">올리기</button>${lbs&&cgOpen?`<button class="btn sm ghost" data-act="cgview" data-k="lbcg" data-id="${c.id}">크게</button>`:''}${lbs?`<button class="btn sm ghost" data-act="ildel" data-k="lbcg" data-id="${c.id}">지우기</button>`:''}</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="ilgen" data-k="lbcg" data-id="${c.id}">NAI로 ${esc(T('limit'))} CG</button><button class="btn sm ghost" data-act="upload" data-k="lbcg" data-id="${c.id}">올리기</button>${lbs?`<button class="btn sm ghost" data-act="ildel" data-k="lbcg" data-id="${c.id}">지우기</button>`:''}</div>
     ${lbs&&cgOpen?`<label class="f" style="margin-top:8px"><input type="checkbox" data-act="cguse" data-id="${c.id}" ${o.useCg?'checked':''}> 로비와 타이틀에 이 CG 쓰기</label>`:''}
     <h3 class="sec">기술 컷인 (스킬 쓸 때 크게)</h3>
     <p class="muted" style="margin:0 0 6px">「${esc(v2Ensure(c).ultimate.name)}」 궁극기를 쓸 때 화면을 가로지르며 크게 나오는 그림이에요. 없으면 스탠딩을 크게 써요.</p>
-    <div class="ill-box scg-box">${imgSrc(scgOf(c))?`<img src="${esc(imgSrc(c.scg))}" alt="">`:'<span>아직 없어요 · 없으면 스탠딩으로 나와요</span>'}</div>
+    <div class="ill-box scg-box">${imgSrcRaw(scgOf(c))?`<img src="${esc(imgSrcRaw(c.scg))}" alt="">`:'<span>아직 없어요 · 없으면 스탠딩으로 나와요</span>'}</div>
     <label class="f" for="sc_scene">장면 요청 (선택 · 생성 시 AI가 궁극기에 맞게 구성)</label><input class="in" id="sc_scene" value="${esc(c.scg.prompt||'')}" placeholder="${esc(ultimateSceneTags(c))}, motion lines">
     <div class="row" style="margin-top:8px"><button class="btn sm" data-act="scggen" data-id="${c.id}">NAI로 기술 컷인</button><button class="btn sm ghost" data-act="upload" data-k="scg" data-id="${c.id}">올리기</button><button class="btn sm ghost" data-act="scgtest" data-id="${c.id}">미리 보기</button>${imgSrc(c.scg)?`<button class="btn sm ghost" data-act="scgdel" data-id="${c.id}">지우기</button>`:''}</div>
     <h3 class="sec">표정과 ${T('skin')}</h3>
@@ -8419,7 +8436,7 @@ function openChar(id){
   openModal(`<div class="cs" style="--ec:${ECOL[c.elem]||'var(--rose)'}">
     <div class="cs-hero">
       <div class="cs-bg" style="${bgStyle(P().lobbyBg||'새벽등대 사무소')}"></div><div class="cs-stripe"></div>
-      <div class="cs-art ${P().csFull?'':'up'}" data-act="cspoke" data-id="${c.id}">${art(c,'',{upper:!P().csFull})}</div><div class="cs-say" id="csSay" hidden></div>${imgSrc(c)?`<button class="cs-frame" data-act="csframe">${P().csFull?'상반신':'전신'}</button>`:''}
+      <div class="cs-art ${P().csFull?'':'up'}" data-act="cspoke" data-id="${c.id}">${characterDetailArt(c,!P().csFull)}</div><div class="cs-say" id="csSay" hidden></div>${imgSrcRaw(skinOf(c)||c)?`<button class="cs-frame" data-act="csframe">${P().csFull?'상반신':'전신'}</button>`:''}
       <div class="cs-top"><button class="cs-back" data-act="close" aria-label="닫기">‹ <b>${esc(T('crew'))}</b></button><span class="cs-cap">${esc(T('crew')).toUpperCase()} INFORMATION</span></div>
       ${SAMPLE&&!playMode()?`<button class="cs-nav ai ${list.length>1?'':'solo'}" data-act="charregen" data-id="${c.id}" title="AI로 다시 만들기">✦ 재생성</button>`:''}${list.length>1?`<button class="cs-nav l" data-act="char" data-id="${prev.id}" aria-label="이전">‹</button><button class="cs-nav r" data-act="char" data-id="${next.id}" aria-label="다음">›</button>`:''}
       <div class="cs-panel">
@@ -8437,6 +8454,7 @@ function openChar(id){
     <div class="cs-tabs">${[['equip','장비·스킬'],['story','스토리'],['look','외형'],['info','정보']].map(([k,l])=>`<button class="${CS_TAB===k?'on':''}" data-act="cstab" data-k="${k}">${l}</button>`).join('')}</div>
     <div class="cs-body">${sec('equip',equip)}${sec('story',story)}${sec('look',look)}${sec('info',info)}</div>
   </div>`,false,'cs-sheet');
+  characterDetailPreviewTargets($('#modal'));
   const s2=$('#modal .sheet'); if(s2){ s2.dataset.cid=id; if(old)s2.scrollTop=keep; }
   if(o&&o.dup>=5&&o.cgNew&&lbs){ o.cgNew=false; mark('prog'); setTimeout(()=>lbReveal(c),500); }
 }
@@ -11921,7 +11939,7 @@ case 'upbuiltin': { const o=LV(); if(o.on&&o.build) o.badBuild=o.build; o.on=fal
 
 async function handleCharactersAction(a,t,id,p,e){
   switch(a){
-case 'csframe': { const p2=P(); p2.csFull=!p2.csFull; mark('prog'); const a2=$('.cs-art'); if(a2){ a2.classList.toggle('up',!p2.csFull); const cc=charById(a2.dataset.id); if(cc) a2.innerHTML=art(cc,'',{upper:!p2.csFull}); } t.textContent=p2.csFull?'상반신':'전신'; break; }
+case 'csframe': { const p2=P(); p2.csFull=!p2.csFull; mark('prog'); const a2=$('.cs-art'); if(a2){ a2.classList.toggle('up',!p2.csFull); const cc=charById(a2.dataset.id); if(cc) a2.innerHTML=characterDetailArt(cc,!p2.csFull); } t.textContent=p2.csFull?'상반신':'전신'; break; }
 case 'cspoke': { const c=charById(id); if(!c) break; const o=own(c.id), lv=o?affLv(o):1, x=e.clientX||innerWidth/2, y=e.clientY||innerHeight/2, r=t.getBoundingClientRect(), zone=(y-r.top)/r.height<0.3?'head':'body';
       ripple(x,y,lv>=7); if(o&&lv>=5&&zone==='head') hearts(x,y,Math.min(5,lv-3)); charReact(t.querySelector('.art'),lv,zone); faceSwap(c,t.querySelector('.art'),touchFace(c,zone,lv));
       const pool=spoilFree(c,o?(zone==='head'&&c.touch?.head?.length?c.touch.head:zone==='body'&&c.touch?.body?.length?c.touch.body:affLinePool(c)):c.lines); const sy=$('#csSay'), l=pickTouchLine(pool,sy?.textContent);
@@ -12660,7 +12678,7 @@ function imageScrollGuard(){
  naiEmotion=function(src,emo,extra,level,eligible=false,originalSrc=''){if(!eligible)return emotion(src,emo,extra,level);return imageCandidates(cfg=>emotion(src,emo,cfg.prompt,level),{prompt:extra||'',originalSrc});};
  // Selection must compare the final full-size composition, never the cropped face.
  focusedInpaint=function(src,mask,draw,settings={}){if(!settings.candidateEligible)return inpaint(src,mask,(...args)=>draw(...args,settings));return imageCandidates(cfg=>inpaint(src,mask,(...args)=>draw(...args,cfg)),settings);};
- const thumbnails='#image-candidate-dialog img, .naiprev.done img, #v2-icon-dialog .ill-box img, .skp-img img';
+ const thumbnails='#image-candidate-dialog img, .naiprev.done img, #v2-icon-dialog .ill-box img, .skp-img img, .cs-sheet [data-character-preview]';
  document.addEventListener('click',e=>{const img=e.target.closest?.(thumbnails);if(!img)return;e.preventDefault();e.stopImmediatePropagation();imagePreviewThumbnail(img);},true);
  document.addEventListener('keydown',e=>{if(document.getElementById('generated-image-preview')&&['Escape','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();if(e.key==='Escape')imagePreviewClose();else document.getElementById('generated-image-preview')._move(e.key==='ArrowLeft'?-1:1);return;}const img=e.target.closest?.(thumbnails);if(img&&['Enter',' '].includes(e.key)){e.preventDefault();e.stopImmediatePropagation();imagePreviewThumbnail(img);return;}if(e.key==='Escape'&&IMAGE_CANDIDATES){e.preventDefault();e.stopImmediatePropagation();imageCandidateBack();}},true);
 })();
