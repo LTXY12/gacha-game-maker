@@ -1,5 +1,5 @@
 {
-  "build": "2026.10.23.5",
+  "build": "2026.10.24.1",
   "notes": [
     "캐릭터 프롬프트 세분화",
     "심연탐사 이름 유동화",
@@ -9,12 +9,12 @@
   ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "c56e6f835cd6a582afd9b0eb7308125683afc4f029fdc91edc0601c70e2a1776",
+  "sha256": "80d9f3741796d861587902cffbafc4bf8bc94afe71999e7b381da41706d830ca",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest",
-    "build": "2026.10.23.5",
+    "build": "2026.10.24.1",
     "minShell": "2026.10.21.6"
   },
   "feedback": "",
-  "at": "2026-10-23T15:22:37.313683Z"
+  "at": "2026-10-23T15:42:32.028533Z"
 }
