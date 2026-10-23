@@ -1,16 +1,20 @@
 {
-  "build": "2026.10.23.1",
+  "build": "2026.10.23.5",
   "notes": [
-    "캐릭터 상세화면 이미지 관련 개선"
+    "캐릭터 프롬프트 세분화",
+    "심연탐사 이름 유동화",
+    "레벨제한 120",
+    "초월승급(71~120) 재료 추가",
+    "나중에 일간/주간 '하드' 컨텐츠에서 획득할 예정"
   ],
   "notice": null,
   "html": "www/index.html",
-  "sha256": "c2a680c7dc4ab6dac124a6cd4e1b2005542544beea850239bf82c12787ba08d1",
+  "sha256": "c56e6f835cd6a582afd9b0eb7308125683afc4f029fdc91edc0601c70e2a1776",
   "apk": {
     "url": "https://github.com/jjhk0803/gacha-game-maker/releases/latest",
-    "build": "2026.10.23.1",
+    "build": "2026.10.23.5",
     "minShell": "2026.10.21.6"
   },
   "feedback": "",
-  "at": "2026-10-23T00:55:07.317092Z"
+  "at": "2026-10-23T15:22:37.313683Z"
 }
