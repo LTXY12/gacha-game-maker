@@ -6371,6 +6371,9 @@ function replaceAll(ng){
 /* 이미지 */
 const imgCache={};
 const IMGNS=PJ().active==='main'?'':PJ().active+'::';
+/* Cloudflare 터널(trycloudflare.com) 접속 시 이미지를 브라우저에 저장하지 않고 서버에서 직접 표시해요.
+   터널 주소는 서버를 켤 때마다 바뀌어서, 매번 이미지를 전부 내려받으면 브라우저 저장 공간이 계속 쌓여요. */
+const isTunnel=()=>/trycloudflare\.com$/i.test(location.hostname);
 async function idbGetNS(k){ let b=null; try{b=await idbGet(IMGNS+k);}catch(e){} if(!b&&IMGNS){ try{b=await idbGet(k);}catch(e){} } return b; }
 function idbOpen(){return appStorage.open();}
 async function idbPut(k,v){await appStorage.mediaWrite(k,v,LKEY);try{const ix=JSON.parse(appStorage.getItem('ggm-sync-idx')||'{}');if(ix[k]){delete ix[k];appStorage.setItem('ggm-sync-idx',JSON.stringify(ix));}}catch(e){}}
@@ -6390,7 +6393,25 @@ function imgSrc(o){
  if(o&&typeof G!=='undefined'&&G){const owner=(G.chars||[]).find(c=>c===o||(c.skins||[]).includes(o));if(owner){if(o!==owner)return skinPreviewSrc(owner,o);if(owner.useStanding===false)return owner.upper&&imgSrcRaw(owner.upper)||null;}}
  return imgSrcRaw(o);
 }
-function imgSrcRaw(o){ if(o&&!o.img&&o.alias&&typeof G!=='undefined'&&G&&G.lib){ const t=G.lib.find(x=>x.id===o.alias); return t&&t!==o&&!t.alias?imgSrc(t):null; } if(!o||!o.img) return null; if(o.img.asset) return null; if(o.img.idb) return imgCache[o.id]||null; return null; }
+function imgSrcRaw(o){
+ if(o&&!o.img&&o.alias&&typeof G!=='undefined'&&G&&G.lib){ const t=G.lib.find(x=>x.id===o.alias); return t&&t!==o&&!t.alias?imgSrc(t):null; }
+ if(!o||!o.img) return null; if(o.img.asset) return null;
+ if(o.img.idb){
+   const cached=imgCache[o.id]; if(cached) return cached;
+   if(isTunnel()){
+     try{
+       const pc=PCS(); if(pc){
+         const key=(typeof IMGNS!=='undefined'?IMGNS:'')+o.id;
+         let bin=null; try{ bin=JSON.parse(localStorage.getItem('__server_bin')||'{}'); }catch(e2){}
+         const h=bin&&(bin[key]||bin[o.id]);
+         if(h) return pc.base+'/api/store/blob/'+h+'?k='+pc.key;
+       }
+     }catch(e){}
+   }
+   return null;
+ }
+ return null;
+}
 const SKP={upper:'상반신',illust:'일러스트',lbcg:'돌파 CG'};
 let NOSKIN=0; // 계약(가챠) 화면·연출은 스킨 없이 기본 모습으로
 const noSkin=f=>function(){ NOSKIN++; try{ return f.apply(this,arguments); }finally{ NOSKIN--; } };
@@ -10183,13 +10204,14 @@ async function pcPull(src){
  if(PCJOB||!PCS())return false;PCJOB=true;PULLERR='';PULLERR_QUOTA=false;
  const prefix='sync-pc-'+uid()+'::',source=G,project=PJ().active,previous=window.__NOFLUSH;let committed=false;
  try{syBar('PC에서 받는 중…');await flush();const S=src&&src.state||await pcApi('/api/store/state',{ok404:true});if(!S)throw Error('PC에 아직 저장된 게임이 없어요');
-  const idx=await syncStageMedia(S,async(k,h)=>{let error;for(let t=0;t<3;t++){try{const r=await pcApi('/api/store/blob/'+h,{binary:true,timeout:60000});if(r?.bytes)return r.bytes;throw Error('빈 자료 응답');}catch(e){error=e;if(e?.code==='bad_key')throw e;if(t<2)await wait(1500*(t+1));}}throw error;},prefix);
+  if(isTunnel()){ try{ localStorage.setItem('__server_bin',JSON.stringify(S.bin||{})); }catch(eT){} }
+  const idx=isTunnel()?syIdx():await syncStageMedia(S,async(k,h)=>{let error;for(let t=0;t<3;t++){try{const r=await pcApi('/api/store/blob/'+h,{binary:true,timeout:60000});if(r?.bytes)return r.bytes;throw Error('빈 자료 응답');}catch(e){error=e;if(e?.code==='bad_key')throw e;if(t<2)await wait(1500*(t+1));}}throw error;},prefix);
   if(G!==source||PJ().active!==project)throw Error('작업 중 게임이 바뀌어 받기를 취소했습니다');await flush();window.__NOFLUSH=true;clearTimeout(flushT);
   const w=await lsApply(S.ls,null,prefix);committed=true;dirty.clear();saveSyIdx(idx);
   const o=PCS();o.last=src&&src.restore?src.cur||Date.now():S.at;o.localAt=src&&src.restore?0:w.at;if(src&&src.restore)o.restored=1;setPCS(o);
   toast('PC의 게임을 받았어요. 다시 시작할게요');setTimeout(()=>reloadGame(),800);return true;
  }catch(e){PULLERR_QUOTA=e?.name==='QuotaExceededError';PULLERR='PC에서 받기 실패. '+syErr(e);toast(PULLERR);if(committed){setTimeout(()=>reloadGame(),800);return true;}return false;}
- finally{if(!committed)window.__NOFLUSH=previous;await appStorage.discard(prefix).catch(()=>{});PCJOB=false;syBar('');}
+ finally{if(!committed)window.__NOFLUSH=previous;if(!(isTunnel()&&committed))await appStorage.discard(prefix).catch(()=>{});PCJOB=false;syBar('');}
 }
 async function pcStart(){
   const pc=PCS(); if(!pc) return; if(window.__BOOTSYNC){ setTimeout(pcStart,1500); return; }
